@@ -3,138 +3,140 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Privacy Policy — helva</title>
-<meta name="description" content="What helva stores, why, and how to get it back or delete it.">
+<title>Privacy Policy — punchcard</title>
+<meta name="description" content="What punchcard stores, why, and how to get it back or delete it.">
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
   body {
-    margin: 0; background: #121212; color: #ededed;
+    margin: 0; background: #09090b; color: #fafafa;
     font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     padding: calc(2rem + env(safe-area-inset-top)) 1.25rem calc(4rem + env(safe-area-inset-bottom));
   }
   main { max-width: 42rem; margin: 0 auto; }
   h1 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 0 0 0.25rem; }
   h2 { font-size: 1.1rem; margin: 2.25rem 0 0.5rem; }
-  .meta { color: #9a9a9a; font-size: 0.9rem; margin: 0 0 2rem; }
-  p, li { color: #d0d0d0; }
+  .meta { color: #62626b; font-size: 0.9rem; margin: 0 0 2rem; }
+  p, li { color: #a1a1aa; }
   ul { padding-left: 1.15rem; }
   li { margin: 0.35rem 0; }
-  a { color: #6fcf97; }
-  strong { color: #ededed; }
-  code { font-family: ui-monospace, "SF Mono", monospace; font-size: 0.9em; background: #262626; padding: 0.1em 0.35em; border-radius: 6px; }
+  a { color: #e9973f; }
+  strong { color: #fafafa; }
+  code { font-family: ui-monospace, "SF Mono", monospace; font-size: 0.9em; background: #1c1c20; padding: 0.1em 0.35em; border-radius: 6px; }
   .brand { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.5rem; }
   .brand svg { width: 28px; height: 28px; }
   .brand span { font-weight: 600; font-size: 1.05rem; }
-  footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid #2b2b2b; color: #9a9a9a; font-size: 0.9rem; }
+  .card { border: 1px solid #232329; background: #131316; border-radius: 10px; padding: 1rem 1.15rem; margin: 1.5rem 0; }
+  .card p { margin: 0; }
+  footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid #232329; color: #62626b; font-size: 0.9rem; }
 </style>
 </head>
 <body>
 <main>
   <div class="brand">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="7" fill="#81c995"/><path d="M7 12.3l3 3L17 8" fill="none" stroke="#073d1c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <span>helva</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2.5" fill="none" stroke="#e9973f" stroke-width="1.6"/><rect x="6" y="8" width="2.4" height="3.4" rx="1.2" fill="#e9973f"/><rect x="10.8" y="8" width="2.4" height="3.4" rx="1.2" fill="#e9973f"/><rect x="10.8" y="12.8" width="2.4" height="3.4" rx="1.2" fill="#e9973f"/><rect x="15.6" y="12.8" width="2.4" height="3.4" rx="1.2" fill="#e9973f"/></svg>
+    <span>punchcard</span>
   </div>
 
   <h1>Privacy Policy</h1>
-  <p class="meta">Last updated 10 August 2026</p>
+  <p class="meta">Last updated 25 August 2026</p>
 
-  <p>helva is a todo app. It stores the tasks you write and the account you sign
-  in with, and nothing else. There is no analytics, no advertising, no tracking,
-  and no third-party SDK inside the app.</p>
+  <p>punchcard is a time tracker. It stores the time you record, the projects you
+  record it against, and — if you connect GitHub — the commits it found during
+  those stretches. There is no analytics, no advertising, and no tracking.</p>
 
   <h2>Who runs this</h2>
-  <p>The hosted service at <code>todo.cobanov.run</code> is operated by
+  <p>The hosted service at <code>punchcard.cobanov.run</code> is operated by
   <strong>Mert Cobanov</strong>. For any question about this policy or about
   your data, write to
   <a href="mailto:mertcobanov@gmail.com">mertcobanov@gmail.com</a>.</p>
-  <p>helva is also open to self-hosting. If you are using someone else's helva
-  server, this policy describes the software's behaviour but the operator of
-  that server is the one holding your data.</p>
+  <p>punchcard is open source and can be self-hosted. If you are using someone
+  else's punchcard server, this policy describes the software's behaviour but the
+  operator of that server is the one holding your data.</p>
 
   <h2>What is stored</h2>
   <ul>
-    <li><strong>Your email address.</strong> It identifies the account and is
-      where account email is sent.</li>
-    <li><strong>Your password, hashed.</strong> Never the password itself. If
-      you sign in with Google or with Apple instead, an identifier from that
-      provider is stored in its place so we can recognise you next time.</li>
-    <li><strong>A display name and a profile picture</strong>, if you choose to
-      set them. Both are optional.</li>
-    <li><strong>Your content:</strong> list names, task titles, notes, due
-      dates, and their order.</li>
+    <li><strong>Your email address.</strong> It identifies the account.</li>
+    <li><strong>An identifier from GitHub</strong> when you sign in with it,
+      so you are recognised next time. If the account has a password instead,
+      only its hash is stored, never the password.</li>
+    <li><strong>A display name, a profile picture and a timezone</strong>, if you
+      set them. The timezone decides where your reporting days are cut.</li>
+    <li><strong>Your projects:</strong> names, client names, and hourly rates.</li>
+    <li><strong>Your time:</strong> when each session started and ended, and the
+      note you wrote on it.</li>
+    <li><strong>Commits punchcard matched to your sessions:</strong> the commit
+      identifier, its first line, its repository name and its timestamp. Not the
+      contents of your code, and not the files it touched.</li>
+    <li><strong>Your GitHub access token</strong>, if you connect GitHub. It is
+      encrypted before it is written down and is used for nothing but reading
+      the commits you authored.</li>
     <li><strong>Sign-in records:</strong> active sessions and any API tokens you
       create, so you can see and revoke them.</li>
     <li><strong>A small security log</strong> of account events such as signing
-      in, changing a password, or deleting the account, together with the IP
-      address the request came from. It exists so you can tell whether someone
-      else has been in your account.</li>
-    <li><strong>A two-factor secret</strong>, only if you turn two-factor
-      authentication on.</li>
+      in or deleting the account, with the IP address the request came from. It
+      exists so you can tell whether someone else has been in your account.</li>
   </ul>
 
   <h2>What is not</h2>
   <ul>
     <li>No advertising identifiers, and nothing is shared with advertisers.</li>
-    <li>No analytics or usage tracking, on the web or in the apps.</li>
+    <li>No analytics or usage tracking.</li>
     <li>No location, contacts, photos, calendar or health data.</li>
+    <li>No source code. punchcard reads commit metadata — message, author, time,
+      repository — and never fetches the contents of a change.</li>
     <li>Nothing is sold, and nothing is shared with anyone for their own
       purposes.</li>
   </ul>
 
   <h2>Why it is stored</h2>
-  <p>To run the service you asked for: to keep you signed in, to sync your tasks
-  between your devices, to share a list with someone when you invite them, and
-  to let you get back into your account if you lose your password. The security
-  log exists to protect the account. There is no other purpose.</p>
+  <p>To run the service you asked for: to keep you signed in, to hold the time
+  you recorded, to total it up when you ask for a report, and to attach the
+  commits that fall inside a session to that session. The security log exists to
+  protect the account. There is no other purpose.</p>
 
   <h2>Who else sees it</h2>
   <ul>
-    <li><strong>People you share a list with.</strong> They see that list, its
-      tasks, and the name or email you are identified by. Nothing else.</li>
-    <li><strong>Your sign-in provider</strong>, if you use one. Signing in with
-      Google or Apple tells them you signed in to helva. helva receives only an
-      identifier and your email address from them.</li>
+    <li><strong>GitHub</strong>, if you connect it. punchcard asks GitHub which
+      repositories you have pushed to recently and which commits you authored in
+      a given window. GitHub learns that those questions were asked.</li>
     <li><strong>Webhooks you configure yourself.</strong> If you point a webhook
-      at another service, helva sends that service what you told it to. That is
-      your integration and your choice.</li>
-    <li>Nobody else. There are no third-party processors beyond the server
-      hosting itself.</li>
+      at another service, punchcard sends that service what you told it to. That
+      is your integration and your choice.</li>
+    <li>Nobody else. punchcard has no sharing between accounts: there is no
+      team, no shared project and no way for another user to see your time.</li>
   </ul>
 
   <h2>Where it lives, and for how long</h2>
-  <p>On the server running helva, in a PostgreSQL database, for as long as your
-  account exists. Deleted tasks are kept briefly so that a device which was
-  offline can still learn they were deleted, and are then removed.</p>
+  <p>On the server running punchcard, in a PostgreSQL database, for as long as
+  your account exists.</p>
 
   <h2>Getting your data out</h2>
-  <p>Settings → Data → <strong>Export my data</strong> gives you a JSON file
-  containing every list and task the account can reach, including ones you have
-  deleted, plus your account details. It is a complete copy and it is available
-  at any time without asking anyone.</p>
+  <p>The account menu → <strong>Download my data</strong> gives you a JSON file
+  containing your projects, every session, the commits attached to them, and your
+  account details. Reports also export as CSV from the Analytics screen. Both are
+  available at any time without asking anyone.</p>
 
   <h2>Deleting your account</h2>
-  <p>Settings → Data → <strong>Delete account</strong>, inside the app. The
-  deletion is immediate and permanent — your account, your lists, your tasks,
-  your sessions and your tokens are removed from the database, not flagged as
-  hidden. It cannot be undone, which is why it asks you to type
-  <code>DELETE</code> first.</p>
-  <p>One thing has to happen first: if you own a list you have shared with
-  someone else, helva will ask you to hand it over or stop sharing it before it
-  will delete the account, so that other people's work does not disappear with
-  yours.</p>
+  <p>Settings → Danger zone → <strong>Delete account</strong>. The deletion is
+  immediate and permanent — your account, your projects, your sessions, the
+  commits attached to them, your stored GitHub token, your sign-in sessions and
+  your API tokens are removed from the database, not flagged as hidden. It cannot
+  be undone, which is why it asks you to type your email address first.</p>
+  <p>Disconnecting GitHub on its own deletes the stored token without touching
+  anything else.</p>
 
   <h2>Children</h2>
-  <p>helva is not directed at children and does not knowingly hold data from
+  <p>punchcard is not directed at children and does not knowingly hold data from
   anyone under 13.</p>
 
   <h2>Changes</h2>
   <p>If this policy changes in a way that affects what is collected or who sees
-  it, the date at the top changes and the change is described in the app's
-  release notes.</p>
+  it, the date at the top changes and the change is described in the release
+  notes.</p>
 
   <footer>
-    <a href="/terms">Terms of Use</a> · <a href="/">helva</a>
+    <a href="/terms">Terms of Use</a> · <a href="/">punchcard</a>
   </footer>
 </main>
 </body>

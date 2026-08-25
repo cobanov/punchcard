@@ -3,91 +3,114 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Support — helva</title>
-<meta name="description" content="How to get help with helva, and answers to the questions that come up most.">
+<title>Support — punchcard</title>
+<meta name="description" content="How to get help with punchcard, and answers to the questions that come up most.">
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
   body {
-    margin: 0; background: #121212; color: #ededed;
+    margin: 0; background: #09090b; color: #fafafa;
     font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     padding: calc(2rem + env(safe-area-inset-top)) 1.25rem calc(4rem + env(safe-area-inset-bottom));
   }
   main { max-width: 42rem; margin: 0 auto; }
   h1 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 0 0 0.25rem; }
   h2 { font-size: 1.1rem; margin: 2.25rem 0 0.5rem; }
-  .meta { color: #9a9a9a; font-size: 0.9rem; margin: 0 0 2rem; }
-  p, li { color: #d0d0d0; }
+  .meta { color: #62626b; font-size: 0.9rem; margin: 0 0 2rem; }
+  p, li { color: #a1a1aa; }
   ul { padding-left: 1.15rem; }
   li { margin: 0.35rem 0; }
-  a { color: #6fcf97; }
-  strong { color: #ededed; }
-  code { font-family: ui-monospace, "SF Mono", monospace; font-size: 0.9em; background: #262626; padding: 0.1em 0.35em; border-radius: 6px; }
+  a { color: #e9973f; }
+  strong { color: #fafafa; }
+  code { font-family: ui-monospace, "SF Mono", monospace; font-size: 0.9em; background: #1c1c20; padding: 0.1em 0.35em; border-radius: 6px; }
   .brand { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.5rem; }
   .brand svg { width: 28px; height: 28px; }
   .brand span { font-weight: 600; font-size: 1.05rem; }
-  .card { background: #1a1a1a; border: 1px solid #2b2b2b; border-radius: 12px; padding: 1.1rem 1.25rem; margin: 1.5rem 0; }
+  .card { border: 1px solid #232329; background: #131316; border-radius: 10px; padding: 1rem 1.15rem; margin: 1.5rem 0; }
   .card p { margin: 0; }
-  footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid #2b2b2b; color: #9a9a9a; font-size: 0.9rem; }
+  footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid #232329; color: #62626b; font-size: 0.9rem; }
 </style>
 </head>
 <body>
 <main>
   <div class="brand">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="7" fill="#81c995"/><path d="M7 12.3l3 3L17 8" fill="none" stroke="#073d1c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <span>helva</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2.5" fill="none" stroke="#e9973f" stroke-width="1.6"/><rect x="6" y="8" width="2.4" height="3.4" rx="1.2" fill="#e9973f"/><rect x="10.8" y="8" width="2.4" height="3.4" rx="1.2" fill="#e9973f"/><rect x="10.8" y="12.8" width="2.4" height="3.4" rx="1.2" fill="#e9973f"/><rect x="15.6" y="12.8" width="2.4" height="3.4" rx="1.2" fill="#e9973f"/></svg>
+    <span>punchcard</span>
   </div>
 
   <h1>Support</h1>
-  <p class="meta">Last updated 10 August 2026</p>
+  <p class="meta">Last updated 25 August 2026</p>
 
   <div class="card">
     <p><strong>Email <a href="mailto:mertcobanov@gmail.com">mertcobanov@gmail.com</a></strong> and you will get a
-    reply from the person who built helva. Include the device and what you were
-    doing; it makes the answer faster.</p>
+    reply from the person who built punchcard. Say what you were doing and which
+    client you were in; it makes the answer faster.</p>
   </div>
 
-  <h2>I forgot my password</h2>
-  <p>helva has no self-service password reset yet. Email the address above from
-  the address on the account and it will be sorted out by hand. If you signed in
-  with Apple, Google or GitHub, there is no helva password at all — use the same
-  button you used the first time.</p>
+  <h2>How do I sign in?</h2>
+  <p>With GitHub. One authorization signs you in and, at the same time, lets
+  punchcard read the commits behind your work — there is no second setup step and
+  no password to forget.</p>
 
-  <h2>Where did my tasks go?</h2>
-  <p>helva keeps everything on the device first, so nothing is lost when the
-  connection drops. If a device looks out of date, check that it is signed in to
-  the same account and has been online since the change. Tasks sync in the
-  background; there is no manual sync button because there is nothing to press.</p>
+  <h2>My commits are not showing up</h2>
+  <p>In the order worth checking:</p>
+  <ul>
+    <li><strong>Were they pushed?</strong> A commit that only exists on your
+      laptop is invisible to punchcard, because it asks GitHub. Push, and it will
+      appear — the last seven days go back through the scanner every hour, so a
+      commit written at 09:00 and pushed at 18:00 still finds its session.</li>
+    <li><strong>Are you the author?</strong> punchcard attaches commits authored
+      by your GitHub account, not everything that landed in the repository.</li>
+    <li><strong>Was a timer running?</strong> Attribution is decided by time. If
+      no timer covered the moment, the commits are not lost — they are shown on
+      the Today screen as unmatched, ready to be turned into a record.</li>
+    <li><strong>Is GitHub connected?</strong> Settings → Connections will say.</li>
+  </ul>
+  <p>Branches are not a problem: punchcard walks every branch, not just the
+  default one.</p>
 
-  <h2>Sharing a list</h2>
-  <p>Open the list's menu and invite someone by email. They see that list and its
-  tasks, and nothing else in your account. Either of you can add and complete
-  tasks; the owner can remove access at any time.</p>
+  <h2>Do I have to link a repository to a project?</h2>
+  <p>No. The scanner asks GitHub which repositories you pushed to and looks
+  there. Linking a repository to a project is optional and does one thing: it
+  sharpens the guess about which project a stretch of unmatched commits belongs
+  to.</p>
+
+  <h2>I forgot to start the timer</h2>
+  <p>Look at the bottom of the Today screen. Commits pushed while nothing was
+  running are grouped by the gaps between them and offered back to you with the
+  time range they cover — pick a project and record it.</p>
+
+  <h2>I started the wrong timer</h2>
+  <p>Starting a new one stops the old one; you never end up with two running.
+  Any finished session can be opened from the list and its project, note, start
+  and end edited, or deleted outright.</p>
+
+  <h2>My days are cut in the wrong place</h2>
+  <p>Settings → Reporting → Timezone. Reports group by day in that zone, so a
+  session that crosses midnight lands on the day you would say it belongs to. A
+  new account starts at UTC.</p>
 
   <h2>Getting your data out</h2>
-  <p>Settings → Data → <strong>Export my data</strong> gives you a JSON file with
-  every list and task the account can reach, including deleted ones, plus your
-  account details. No one has to approve it and it is available at any time.</p>
+  <p>The account menu → <strong>Download my data</strong> gives you a JSON file
+  with your projects, every session and the commits attached to them, plus your
+  account details. The Analytics screen also exports the current range as CSV.
+  No one has to approve either, and both are available at any time.</p>
 
   <h2>Deleting your account</h2>
-  <p>Settings → Data → <strong>Delete account</strong>, inside the app. It is
-  immediate and permanent, which is why it asks you to type <code>DELETE</code>
-  first. If you own a list you have shared, helva asks you to hand it over or
-  stop sharing it first, so that other people's work does not disappear with
-  yours.</p>
+  <p>Settings → Danger zone → <strong>Delete account</strong>. It is immediate
+  and permanent, which is why it asks you to type your email address first.</p>
 
-  <h2>Using helva from an assistant or a script</h2>
-  <p>helva has an HTTP API and an MCP server. Create a token in Settings →
-  Tokens, give it to the tool, and revoke it whenever you like. The API
+  <h2>Using punchcard from a terminal or a script</h2>
+  <p>There is a command line client and a macOS menu bar app, both of which sign
+  in through the same browser flow. For anything else there is an HTTP API; the
   documentation is at <a href="/docs">/docs</a>.</p>
 
   <h2>Something is broken</h2>
-  <p>Email the address above. If the app cannot reach the server at all, it keeps
-  working offline — your changes are safe on the device and will sync when the
-  service is back.</p>
+  <p>Email the address above. If you were running a timer when it happened, say
+  roughly when — the record is on the server, so it is usually recoverable.</p>
 
   <footer>
-    <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Use</a> · <a href="/">helva</a>
+    <a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Use</a> · <a href="/">punchcard</a>
   </footer>
 </main>
 </body>

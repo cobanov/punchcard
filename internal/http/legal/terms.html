@@ -3,60 +3,72 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Terms of Use — helva</title>
-<meta name="description" content="The terms you agree to when you use the hosted helva service.">
+<title>Terms of Use — punchcard</title>
+<meta name="description" content="The terms you agree to when you use the hosted punchcard service.">
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
   body {
-    margin: 0; background: #121212; color: #ededed;
+    margin: 0; background: #09090b; color: #fafafa;
     font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     padding: calc(2rem + env(safe-area-inset-top)) 1.25rem calc(4rem + env(safe-area-inset-bottom));
   }
   main { max-width: 42rem; margin: 0 auto; }
   h1 { font-size: 1.6rem; letter-spacing: -0.02em; margin: 0 0 0.25rem; }
   h2 { font-size: 1.1rem; margin: 2.25rem 0 0.5rem; }
-  .meta { color: #9a9a9a; font-size: 0.9rem; margin: 0 0 2rem; }
-  p, li { color: #d0d0d0; }
+  .meta { color: #62626b; font-size: 0.9rem; margin: 0 0 2rem; }
+  p, li { color: #a1a1aa; }
   ul { padding-left: 1.15rem; }
   li { margin: 0.35rem 0; }
-  a { color: #6fcf97; }
-  strong { color: #ededed; }
-  code { font-family: ui-monospace, "SF Mono", monospace; font-size: 0.9em; background: #262626; padding: 0.1em 0.35em; border-radius: 6px; }
+  a { color: #e9973f; }
+  strong { color: #fafafa; }
+  code { font-family: ui-monospace, "SF Mono", monospace; font-size: 0.9em; background: #1c1c20; padding: 0.1em 0.35em; border-radius: 6px; }
   .brand { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.5rem; }
   .brand svg { width: 28px; height: 28px; }
   .brand span { font-weight: 600; font-size: 1.05rem; }
-  footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid #2b2b2b; color: #9a9a9a; font-size: 0.9rem; }
+  .card { border: 1px solid #232329; background: #131316; border-radius: 10px; padding: 1rem 1.15rem; margin: 1.5rem 0; }
+  .card p { margin: 0; }
+  footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid #232329; color: #62626b; font-size: 0.9rem; }
 </style>
 </head>
 <body>
 <main>
   <div class="brand">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="7" fill="#81c995"/><path d="M7 12.3l3 3L17 8" fill="none" stroke="#073d1c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <span>helva</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2.5" fill="none" stroke="#e9973f" stroke-width="1.6"/><rect x="6" y="8" width="2.4" height="3.4" rx="1.2" fill="#e9973f"/><rect x="10.8" y="8" width="2.4" height="3.4" rx="1.2" fill="#e9973f"/><rect x="10.8" y="12.8" width="2.4" height="3.4" rx="1.2" fill="#e9973f"/><rect x="15.6" y="12.8" width="2.4" height="3.4" rx="1.2" fill="#e9973f"/></svg>
+    <span>punchcard</span>
   </div>
 
   <h1>Terms of Use</h1>
-  <p class="meta">Last updated 10 August 2026</p>
+  <p class="meta">Last updated 25 August 2026</p>
 
-  <p>These terms cover the hosted helva service at <code>todo.cobanov.run</code>
-  and the helva apps that connect to it, operated by <strong>Mert Cobanov</strong>
-  ("we"). Using the service means accepting them.</p>
+  <p>These terms cover the hosted punchcard service at
+  <code>punchcard.cobanov.run</code> and the clients that connect to it — the web
+  app, the command line tool and the menu bar app — operated by
+  <strong>Mert Cobanov</strong> ("we"). Using the service means accepting them.</p>
 
   <h2>Your account</h2>
-  <p>You need an account to use helva. Keep your password to yourself, and tell
-  us at <a href="mailto:mertcobanov@gmail.com">mertcobanov@gmail.com</a> if you
-  think someone else has got into your account. You are responsible for what
-  happens under your account. One person, one account — do not share
-  credentials.</p>
+  <p>You need an account to use punchcard. Signing in happens through GitHub;
+  keep that account secure, and tell us at
+  <a href="mailto:mertcobanov@gmail.com">mertcobanov@gmail.com</a> if you think
+  someone else has got into yours. You are responsible for what happens under
+  your account. One person, one account — do not share credentials.</p>
   <p>You must be at least 13 years old.</p>
 
   <h2>Your content is yours</h2>
-  <p>The lists and tasks you write remain yours. We claim no ownership of them.
-  We store and transmit them only to run the service for you: to sync your
-  devices, and to show a list to the people you have shared it with.</p>
-  <p>You can export everything at any time from Settings → Data, and delete the
-  account outright from the same screen.</p>
+  <p>The projects you create and the time you record remain yours. We claim no
+  ownership of them. We store and transmit them only to run the service for you:
+  to show you your own records, to total them into reports, and to attach the
+  commits that fall inside a session to that session.</p>
+  <p>You can export everything at any time from the account menu, and delete the
+  account outright from Settings.</p>
+
+  <h2>Connecting GitHub</h2>
+  <p>Connecting GitHub is optional and the timer works without it. When you do
+  connect it, you are granting punchcard read access to the repositories your
+  GitHub account can reach, and punchcard uses that access for one thing: finding
+  the commits you authored inside the windows you tracked. It never writes to
+  your repositories. You can disconnect at any time from Settings, which deletes
+  the stored token.</p>
 
   <h2>What you agree not to do</h2>
   <ul>
@@ -67,23 +79,23 @@
       or interfering with anyone else's use of it.</li>
     <li>Resell the hosted service as your own.</li>
   </ul>
-  <p>helva has a public API and an MCP server, and automating your own account
-  through them is expressly fine — that is what they are for. Reasonable rate
-  limits apply so that one account cannot degrade the service for others.</p>
+  <p>punchcard has a public API, and automating your own account through it is
+  expressly fine — that is what it is for. Reasonable rate limits apply so that
+  one account cannot degrade the service for others.</p>
 
   <h2>Availability</h2>
-  <p>helva is run by one person on modest infrastructure. It is offered as it
+  <p>punchcard is run by one person on modest infrastructure. It is offered as it
   is, with no uptime guarantee. It may be unavailable for maintenance, and
   features may change or be withdrawn.</p>
-  <p>This is why the app works offline and why the export exists: if the service
-  ever goes away, your data should not be trapped in it. Keep your own copy of
-  anything you cannot afford to lose.</p>
+  <p>This is why the export exists, and why the whole thing is a single binary
+  you can run yourself: if the hosted service ever goes away, your data should
+  not be trapped in it. Keep your own copy of anything you cannot afford to
+  lose.</p>
 
   <h2>Ending it</h2>
-  <p>You can stop at any time by deleting your account in the app. We may
-  suspend or close an account that is breaking these terms, or is being used to
-  harm the service or other people. Where it is reasonable to do so, we will say
-  why first.</p>
+  <p>You can stop at any time by deleting your account. We may suspend or close
+  an account that is breaking these terms, or is being used to harm the service
+  or other people. Where it is reasonable to do so, we will say why first.</p>
 
   <h2>The legal part</h2>
   <p>The service is provided <strong>"as is"</strong>, without warranties of any
@@ -95,16 +107,16 @@
   terms wherever the two disagree.</p>
 
   <h2>The software itself</h2>
-  <p>helva's source is available and can be self-hosted. Running your own copy
-  is governed by the licence that ships with the source, not by these terms;
-  these terms cover the hosted service only.</p>
+  <p>punchcard's source is open and can be self-hosted. Running your own copy is
+  governed by the licence that ships with the source, not by these terms; these
+  terms cover the hosted service only.</p>
 
   <h2>Changes</h2>
   <p>If these terms change, the date at the top changes. Continuing to use the
   service after that means accepting the new version.</p>
 
   <footer>
-    <a href="/privacy">Privacy Policy</a> · <a href="/">helva</a>
+    <a href="/privacy">Privacy Policy</a> · <a href="/">punchcard</a>
   </footer>
 </main>
 </body>
