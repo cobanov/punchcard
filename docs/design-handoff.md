@@ -1,12 +1,9 @@
-# Design handoff
+# Design notes
 
-Written on 2026-08-25, when the design was handed to someone else to take over.
-It says what is there, why, and what is wrong with it — so none of that has to
-be rediscovered by reading the CSS.
-
-Nothing here is binding. It is a record of decisions, including the ones that
-turned out badly, so the next pass can overturn them deliberately rather than by
-accident.
+Rewritten on 2026-08-25 after the second design pass. The first version of this
+file handed off a drawn-timeline design; that design is gone, and a document
+describing it would now mislead. What follows is the current state, the
+decisions behind it, and what is still open.
 
 ## Where it is
 
@@ -18,76 +15,67 @@ accident.
 | Build | `make web` → `internal/http/webui/dist`, embedded in the binary |
 | Deploy | `./scratchpad/deploy.sh <version>` |
 
-React 19 + Vite 7 + Tailwind v4. Two Vite entries: `app` and `landing`. The
-landing page does not import the application bundle — it ships its own
-stylesheet and about sixty lines of script, because it is what a stranger sees
-first and it has to paint before any JavaScript arrives.
+React 19 + Vite 7 + Tailwind v4, two Vite entries (`app`, `landing`). The
+landing page does not import the application bundle — it paints before any
+JavaScript arrives.
 
 > **The trap:** the binary serves the EMBEDDED `dist`, not `web/dist`. After a
 > change run `make web` **and restart**. Verify with the served asset hash:
 > `curl -s localhost:8080/app | grep -o 'assets/app-[^"]*\.js'`.
 
-## The decisions, and why
+## The brief the app is built to
 
-**Dark only.** Not a default — a decision, and a late one. The app followed the
-system at first, so signing in from the dark landing page turned the product
-white and it changed identity walking through its own front door. A light theme
-belongs in settings, chosen by a person, not switched on by a laptop.
+Fast, unconfusing, gone in seconds: open, press start, glance at a number, get
+back to work. The design language is flat zinc — shadcn's dialect — dense 13px
+rows, hairline borders, no shadows, pill tabs, one white primary button.
 
-**IBM Plex Sans and Mono, bundled.** IBM made the punch card, so the typeface is
-the subject's own rather than a neutral pick. Bundling instead of linking a font
-host keeps a self-hosted instance self-contained.
+## The decisions
 
-**Amber means time, and nothing else.** It appears on the running clock, on
-commits, on the running band, on focus. Not on buttons — solid buttons are the
-highest-contrast neutral. An accent that appears everywhere means nothing, and
-amber on a light button was muddy brown besides.
+**Dark only.** A decision, not a default. The landing page is dark because its
+visual idea is light through punched holes; the app is dark so the product does
+not change identity on the way through its own front door. A light theme
+belongs in settings, chosen by a person.
 
-**Every neutral is cool-tinted, from one family.** The first light palette put a
-warm accent on a warm ground and landed exactly on the cream-and-terracotta look
-every generated page arrives in.
+**Amber means time, and nothing else.** The running clock and dot, commit
+counts and shas, the recovery affordance, focus rings. Never buttons, never
+chrome. This is the one thread tying the app to the landing page, and it only
+works because it is scarce.
 
-**The day is a punch card, not a list.** Sessions are bands on an hour scale;
-commits are punches inside them; a commit no session covers is a hollow punch in
-empty space. Every other tracker lists the day, which answers "what did I do".
-This answers the second question the product exists for — which stretches have
-evidence and which do not — and makes the recovery feature something you see
-rather than a section heading. It is the one real risk in the design.
+**IBM Plex Sans + Mono, bundled.** IBM made the punch card; the typeface is the
+subject's own. Bundling keeps a self-hosted instance self-contained.
 
-**The landing hero draws the card rather than photographing anything.** 80
-columns by 12 rows, laid back in perspective. The punched columns spell the
-product's own sentence in IBM 029 keypunch encoding. The light through those
-holes is where the accent colour comes from, so the palette is a consequence of
-the image rather than a brand choice.
+**The day is rows, newest first.** The drawn timeline was the first design's
+big swing and it lost on the terms that matter here: rows collided, short
+sessions were unreadable, a normal day looked like an empty chart. A tool you
+open for ten seconds cannot ask to be interpreted. The timeline's *vocabulary*
+survives — amber evidence on sessions, hollow-marked recovery cards for work no
+timer covered — without its geometry.
 
-## What is wrong with it
+**Stats are a glance, not a visit.** today · week · commits sit under the timer
+bar on the main screen. Reports keeps ranges (7/30 days), amounts and CSV, and
+fetches its own data so the main screen never pays for it.
 
-Known, unfixed, and worth fixing:
+**Everything edits where it is displayed.** The rate is a click-to-edit cell
+(Enter saves, Escape leaves, empty clears — "not costed" is not "costed at
+zero"). Repositories live behind an expandable project row. `window.prompt()`
+is gone.
 
-1. **Overlapping rows in the day card.** Two sessions close in time draw on top
-   of each other — the labels and the commit rows collide. Visible on the live
-   app right now around 12:00. The card positions rows absolutely by clock time
-   with no collision handling at all.
-2. **A sparse day looks sparse.** Most days have two or three sessions, and the
-   card is mostly empty rail. The panel helped; it is not solved.
-3. **Very short sessions are unreadable.** A ten-minute session is a 6px band
-   with a full label overflowing it.
-4. **Projects and Reports had no design pass.** They are functional lists that
-   inherited the tokens. The Projects screen in particular still uses `prompt()`
-   to edit a rate, which is a placeholder, not a decision.
-5. **No empty state for Reports**, and the loading state is a bare word rather
-   than the skeleton the stylesheet defines.
-6. **No keyboard surface beyond `n`.** A tool this shape wants a command menu.
-7. **Mobile is untested.** The layout is responsive in the trivial sense and
-   nothing has been looked at below 640px.
+**Durations say `6h 12m` everywhere.** The landing already spoke h/m while the
+app said `6s 12d` — one number, two vocabularies.
 
-## The audit this was measured against
+## Still open
 
-`.agents/skills/redesign-existing-projects` — installed in this repo. The first
-version of this design failed most of it (airy where it should be dense, warm on
-warm, no texture, no press feedback, no composed empty states, no favicon or
-social meta). Running it again on the current state is a reasonable place to
-start.
+1. **No command menu.** `n` focuses the note input and Escape blurs; a tool
+   this shape wants ⌘K eventually.
+2. **Mobile has had no deliberate pass.** The layout wraps sanely (flex +
+   truncation) but nothing below 640px has been designed.
+3. **Sessions cannot be edited from the web.** The API supports time
+   corrections, split and delete; no client exposes them yet.
+4. **The landing page** kept its own richer style (the drawn card hero) — it
+   was liked, it stays. If the app's zinc and the landing ever feel like two
+   products, the landing moves toward the app, not the other way.
 
-Also installed and unread: `minimalist-ui`, `high-end-visual-design`,
-`industrial-brutalist-ui`, `stitch-design-taste`, `brandkit`.
+## The audit
+
+`.agents/skills/redesign-existing-projects` is installed in this repo and is
+the checklist this pass was measured against.
