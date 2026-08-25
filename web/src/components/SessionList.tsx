@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import type { Cluster, Commit, Project, Session } from "../lib/api";
 import { firstLine, hhmm, total } from "../lib/format";
 
@@ -41,7 +41,18 @@ export function SessionList({ sessions, commits, projects, onSave, onDelete, bus
   }
 
   return (
-    <ul className="divide-y divide-line">
+    // One template for the header and every row below it. The commit cell is a
+    // fixed track rather than a badge that sizes itself, so the note beside it
+    // truncates at the same pixel on every row.
+    <div style={{ "--tbl-cols": "5.5rem 9rem minmax(0, 1fr) 3.5rem 3.5rem" } as CSSProperties}>
+      <div className="tbl-head" aria-hidden>
+        <span>Time</span>
+        <span>Project</span>
+        <span>Note</span>
+        <span className="text-center">Commits</span>
+        <span className="truncate text-right">Duration</span>
+      </div>
+      <ul className="divide-y divide-line">
       {finished.map((session) => {
         const own = commits[session.id] ?? [];
         const expanded = open === session.id;
@@ -50,17 +61,17 @@ export function SessionList({ sessions, commits, projects, onSave, onDelete, bus
             <button
               onClick={() => setOpen(expanded ? null : session.id)}
               aria-expanded={expanded}
-              className="flex w-full items-baseline gap-3 px-3 py-2 text-left transition-colors duration-100 hover:bg-raise/60"
+              className="tbl-row w-full transition-colors duration-100 hover:bg-raise/60"
             >
-              <span className="tnum w-[5.5rem] shrink-0 font-mono text-[11px] text-faint">
+              <span className="tnum t-caption font-mono text-faint">
                 {hhmm(session.started_at)}–{session.ended_at ? hhmm(session.ended_at) : "…"}
               </span>
-              <span className="w-32 shrink-0 truncate font-medium">
+              <span className="truncate font-medium">
                 {projectName(session.project_id)}
               </span>
-              <span className="min-w-0 flex-1 truncate text-dim">{session.note || "—"}</span>
+              <span className="truncate text-dim">{session.note || "—"}</span>
               <CommitBadge count={own.length} syncState={session.commit_sync_state} />
-              <span className="tnum w-14 shrink-0 text-right font-mono text-[11px] text-dim">
+              <span className="tbl-num t-caption text-dim">
                 {total(session.seconds)}
               </span>
             </button>
@@ -77,7 +88,7 @@ export function SessionList({ sessions, commits, projects, onSave, onDelete, bus
                 {own.length > 0 && (
                   <ul className="space-y-1 pt-1">
                     {own.map((commit) => (
-                      <li key={commit.sha} className="flex items-baseline gap-2.5 text-[12px]">
+                      <li key={commit.sha} className="flex items-baseline gap-2.5 t-body">
                         <a
                           href={commit.url}
                           target="_blank"
@@ -89,7 +100,7 @@ export function SessionList({ sessions, commits, projects, onSave, onDelete, bus
                         <span className="min-w-0 flex-1 truncate text-dim">
                           {firstLine(commit.message)}
                         </span>
-                        <span className="shrink-0 font-mono text-[11px] text-faint">
+                        <span className="shrink-0 font-mono t-caption text-faint">
                           {commit.repo}
                         </span>
                       </li>
@@ -101,7 +112,8 @@ export function SessionList({ sessions, commits, projects, onSave, onDelete, bus
           </li>
         );
       })}
-    </ul>
+      </ul>
+    </div>
   );
 }
 
@@ -156,7 +168,7 @@ function EditRow({
         value={projectID}
         onChange={(e) => setProjectID(e.target.value)}
         aria-label="Project"
-        className="field max-w-[9rem] py-0.5 text-[12px]"
+        className="select max-w-[9rem] py-0.5 t-caption"
       >
         {projects.map((p) => (
           <option key={p.id} value={p.id}>
@@ -170,14 +182,14 @@ function EditRow({
         onKeyDown={(e) => e.key === "Enter" && save()}
         placeholder="What was this?"
         aria-label="Note"
-        className="field min-w-32 flex-1 py-0.5 text-[12px]"
+        className="field min-w-32 flex-1 py-0.5 t-body"
       />
       <input
         type="time"
         value={start}
         onChange={(e) => setStart(e.target.value)}
         aria-label="Start time"
-        className="field py-0.5 font-mono text-[12px]"
+        className="field py-0.5 font-mono t-body"
       />
       <span className="text-faint">–</span>
       <input
@@ -186,15 +198,15 @@ function EditRow({
         onChange={(e) => setEnd(e.target.value)}
         aria-label="End time"
         disabled={!session.ended_at}
-        className="field py-0.5 font-mono text-[12px]"
+        className="field py-0.5 font-mono t-body"
       />
-      <button onClick={save} disabled={busy || !dirty} className="btn-ghost py-0.5 text-[12px]">
+      <button onClick={save} disabled={busy || !dirty} className="btn-ghost py-0.5 t-body">
         Save
       </button>
       <button
         onClick={() => confirm("Delete this session? Its commits become unmatched again.") && onDelete()}
         disabled={busy}
-        className="btn-bare ml-auto text-[12px] hover:text-punch"
+        className="btn-bare ml-auto t-body hover:text-punch"
       >
         Delete
       </button>
@@ -219,18 +231,29 @@ function onDay(iso: string, hhmmValue: string): string {
 /** The evidence, at a glance. Amber only when there is any — a zero on every
  *  row would drain the accent of meaning. Commits are optional garnish here,
  *  not structure: a session without them is a complete record. */
+/**
+ * The commit count, in a cell that is the same width whether or not there is
+ * one. The badge used to size itself, which made every note beside it truncate
+ * somewhere slightly different — the column edge came out ragged with no row
+ * being individually wrong. The track is fixed now and the badge centres in it.
+ */
 function CommitBadge({ count, syncState }: { count: number; syncState: string }) {
-  if (count > 0) {
-    return (
-      <span className="tnum shrink-0 rounded-full border border-punch-deep px-1.5 font-mono text-[10px] leading-[1.6] text-punch">
-        {count}
-      </span>
-    );
-  }
-  if (syncState === "pending") {
-    return <span className="shrink-0 text-[10px] text-faint">sync…</span>;
-  }
-  return <span className="w-4 shrink-0" aria-hidden />;
+  return (
+    <span className="flex justify-center">
+      {count > 0 ? (
+        <span
+          title={`${count} commit${count === 1 ? "" : "s"} in this session`}
+          className="tnum rounded-full border border-punch-deep px-1.5 font-mono t-caption text-punch"
+        >
+          {count}
+        </span>
+      ) : syncState === "pending" ? (
+        <span className="t-caption text-faint" title="Looking for commits">
+          ·
+        </span>
+      ) : null}
+    </span>
+  );
 }
 
 /**
@@ -292,18 +315,18 @@ function UnmatchedRow({
         aria-hidden
         title="Commits with no session around them"
       />
-      <span className="min-w-0 flex-1 truncate text-[12px] text-dim">
+      <span className="min-w-0 flex-1 truncate t-body text-dim">
         <span className="text-text">{n} commit{n === 1 ? "" : "s"}</span>
         {" · "}
         {clusterDayLabel(cluster.from)}
         {hhmm(cluster.from)}–{hhmm(cluster.to)} · no timer was running ·{" "}
-        <span className="font-mono text-[11px]">{repos}</span>
+        <span className="font-mono t-caption">{repos}</span>
       </span>
       <select
         value={projectID}
         onChange={(e) => setProjectID(e.target.value)}
         aria-label="Project to record this under"
-        className="field max-w-[9rem] py-0.5 text-[12px]"
+        className="select max-w-[9rem] py-0.5 t-caption"
       >
         {projects.map((p) => (
           <option key={p.id} value={p.id}>
@@ -314,7 +337,7 @@ function UnmatchedRow({
       <button
         onClick={() => projectID && onRecover(cluster, projectID)}
         disabled={busy || !projectID}
-        className="btn-ghost py-0.5 text-[12px] hover:border-punch hover:text-punch"
+        className="btn-ghost py-0.5 t-body hover:border-punch hover:text-punch"
       >
         Record
       </button>

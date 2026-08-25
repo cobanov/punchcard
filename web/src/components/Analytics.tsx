@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { api, type ProjectTotal } from "../lib/api";
 import { money, total } from "../lib/format";
 
@@ -386,23 +386,30 @@ function Breakdown({
   totalSeconds: number;
 }) {
   return (
-    <section className="panel overflow-hidden">
-      <h3 className="eyebrow border-b border-line px-3 py-2">By project</h3>
+    <section
+      className="panel overflow-hidden"
+      // Same template for the header and every row, so the share, the time and
+      // the amount each land on one vertical edge instead of near it.
+      style={{ "--tbl-cols": "minmax(0, 1fr) 7rem 3rem 4.5rem 6rem" } as CSSProperties}
+    >
+      <div className="tbl-head">
+        <span>Project</span>
+        <span>Client</span>
+        <span className="text-right">Share</span>
+        <span className="text-right">Time</span>
+        <span className="text-right">Amount</span>
+      </div>
       <ul className="divide-y divide-line">
         {projects.map((p) => {
           const share = Math.round((p.seconds / totalSeconds) * 100);
           return (
-            <li key={p.project_id} className="px-3 py-2">
-              <div className="flex items-baseline gap-3">
-                <span className="w-40 shrink-0 truncate font-medium">{p.name}</span>
-                <span className="min-w-0 flex-1 truncate text-dim">{p.client}</span>
-                <span className="tnum w-10 shrink-0 text-right font-mono t-caption text-faint">
-                  {share}%
-                </span>
-                <span className="tnum w-16 shrink-0 text-right font-mono text-dim">
-                  {total(p.seconds)}
-                </span>
-                <span className="tnum w-24 shrink-0 text-right font-mono">
+            <li key={p.project_id} className="pb-2 pt-1">
+              <div className="tbl-row">
+                <span className="truncate font-medium">{p.name}</span>
+                <span className="truncate text-dim">{p.client || "—"}</span>
+                <span className="tbl-num t-caption text-faint">{share}%</span>
+                <span className="tbl-num text-dim">{total(p.seconds)}</span>
+                <span className="tbl-num">
                   {p.amount_cents == null ? (
                     <span className="text-faint">—</span>
                   ) : (
@@ -410,7 +417,7 @@ function Breakdown({
                   )}
                 </span>
               </div>
-              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-raise" aria-hidden>
+              <div className="mx-3 h-1 overflow-hidden rounded-full bg-raise" aria-hidden>
                 <div className="h-full rounded-full bg-punch/70" style={{ width: `${share}%` }} />
               </div>
             </li>

@@ -61,7 +61,7 @@ export function TimerBar({ current, projects, projectName, onStart, onStop, busy
     return (
       <section aria-label="Running timer" className="panel flex items-center gap-3 px-4 py-3">
         <span className="breathe h-2 w-2 shrink-0 rounded-full bg-punch" aria-hidden />
-        <span className="tnum shrink-0 font-mono text-[22px] font-medium leading-none tracking-tight text-punch">
+        <span className="t-clock shrink-0 text-punch">
           {clock(elapsed(current))}
         </span>
         <div className="min-w-0 flex-1">
@@ -69,7 +69,7 @@ export function TimerBar({ current, projects, projectName, onStart, onStop, busy
             <span className="font-medium">{projectName(current.project_id)}</span>
             {current.note && <span className="text-dim"> · {current.note}</span>}
           </p>
-          <p className="tnum font-mono text-[10px] leading-tight text-faint">
+          <p className="tnum font-mono t-caption leading-tight text-faint">
             since {hhmm(current.started_at)}
           </p>
         </div>
@@ -97,16 +97,16 @@ export function TimerBar({ current, projects, projectName, onStart, onStop, busy
           onChange={(e) => setNote(e.target.value)}
           placeholder="What are you working on?"
           aria-label="What are you working on?"
-          className="min-w-0 flex-1 bg-transparent py-1 text-[14px] outline-none placeholder:text-faint"
+          className="min-w-0 flex-1 bg-transparent py-1 t-lead outline-none placeholder:text-faint"
         />
-        <kbd className="hidden shrink-0 rounded border border-line px-1.5 font-mono text-[10px] leading-[1.7] text-faint sm:block">
+        <kbd className="hidden shrink-0 rounded border border-line px-1.5 font-mono t-caption leading-[1.7] text-faint sm:block">
           n
         </kbd>
         <select
           value={projectID}
           onChange={(e) => setProjectID(e.target.value)}
           aria-label="Project"
-          className="field max-w-[11rem] py-1.5"
+          className="select max-w-[11rem] py-1.5"
         >
           {projects.map((p) => (
             <option key={p.id} value={p.id}>

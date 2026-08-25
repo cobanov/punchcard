@@ -270,8 +270,8 @@ function StatsStrip({
 
   const item = (label: string, value: string) => (
     <span className="flex items-baseline gap-1.5">
-      <span className="text-[11px] text-faint">{label}</span>
-      <span className="tnum font-mono text-[12px] text-dim">{value}</span>
+      <span className="t-caption text-faint">{label}</span>
+      <span className="tnum font-mono t-body text-dim">{value}</span>
     </span>
   );
 
@@ -296,7 +296,7 @@ function DayNav({ day, onChange }: { day: Date; onChange: (d: Date) => void }) {
       <button
         onClick={() => onChange(addDays(day, -1))}
         aria-label="Previous day"
-        className="btn-bare px-1.5 text-[14px] leading-none"
+        className="btn-bare px-1.5 t-lead leading-none"
       >
         ‹
       </button>
@@ -304,7 +304,7 @@ function DayNav({ day, onChange }: { day: Date; onChange: (d: Date) => void }) {
         onClick={() => onChange(addDays(day, 1))}
         disabled={today}
         aria-label="Next day"
-        className="btn-bare px-1.5 text-[14px] leading-none disabled:opacity-30"
+        className="btn-bare px-1.5 t-lead leading-none disabled:opacity-30"
       >
         ›
       </button>
@@ -317,13 +317,13 @@ function DayNav({ day, onChange }: { day: Date; onChange: (d: Date) => void }) {
           if (e.target.value) onChange(new Date(`${e.target.value}T00:00:00`));
         }}
         aria-label="Go to date"
-        className="field border-0 bg-transparent py-0.5 font-mono text-[12px] text-dim"
+        className="field border-0 bg-transparent py-0.5 font-mono t-body text-dim"
       />
-      <span className="text-[12px] font-medium text-text">
+      <span className="t-body font-medium text-text">
         {today ? "Today" : dayName(day)}
       </span>
       {!today && (
-        <button onClick={() => onChange(startOfToday())} className="btn-ghost ml-auto py-0.5 text-[11px]">
+        <button onClick={() => onChange(startOfToday())} className="btn-ghost ml-auto py-0.5 t-caption">
           Today
         </button>
       )}
@@ -394,7 +394,7 @@ function SignIn() {
         <a href={signInURL} className="btn-primary mt-7 block w-full py-2.5 text-center">
           Sign in with GitHub
         </a>
-        <p className="mt-4 text-[12px] leading-relaxed text-faint">
+        <p className="mt-4 t-body leading-relaxed text-faint">
           One authorization signs you in and lets punchcard read the commits behind your work.
           Nothing is written to your repositories.
         </p>

@@ -59,7 +59,7 @@ export function Projects({ projects, onChange }: { projects: Project[]; onChange
                     run(() => api.deleteProject(project.id))
                   }
                   aria-label={`Archive ${project.name}`}
-                  className="btn-bare text-[12px]"
+                  className="btn-bare t-body"
                 >
                   archive
                 </button>
@@ -103,7 +103,7 @@ function RateCell({
           setEditing(true);
         }}
         title="Change the hourly rate"
-        className="tnum w-28 shrink-0 text-right font-mono text-[12px] text-dim transition-colors hover:text-text"
+        className="tnum w-28 shrink-0 text-right font-mono t-body text-dim transition-colors hover:text-text"
       >
         {shown}
       </button>
@@ -135,7 +135,7 @@ function RateCell({
       inputMode="decimal"
       aria-label={`Hourly rate for ${project.name}, in ${project.currency}`}
       placeholder="empty = none"
-      className="field w-28 shrink-0 py-0.5 text-right font-mono text-[12px]"
+      className="field w-28 shrink-0 py-0.5 text-right font-mono t-body"
     />
   );
 }
@@ -163,7 +163,7 @@ function RepoRow({ projectID, onError }: { projectID: string; onError: (m: strin
         repos.map((repo) => (
           <span
             key={repo.id}
-            className="inline-flex items-center gap-1.5 rounded bg-raise px-1.5 py-0.5 font-mono text-[11px] text-dim"
+            className="inline-flex items-center gap-1.5 rounded bg-raise px-1.5 py-0.5 font-mono t-caption text-dim"
           >
             {repo.full_name}
             <button
@@ -201,11 +201,11 @@ function RepoRow({ projectID, onError }: { projectID: string; onError: (m: strin
           onChange={(e) => setValue(e.target.value)}
           placeholder="owner/repo"
           aria-label="Link a repository"
-          className="field w-36 py-0.5 font-mono text-[11px]"
+          className="field w-36 py-0.5 font-mono t-caption"
         />
-        <button className="btn-bare text-[11px]">link</button>
+        <button className="btn-bare t-caption">link</button>
       </form>
-      <span className="ml-auto text-[11px] text-faint">
+      <span className="ml-auto t-caption text-faint">
         optional — punchcard finds the repositories you push to on its own
       </span>
     </div>
@@ -267,7 +267,7 @@ function NewProject({ onDone, onError }: { onDone: () => void; onError: (m: stri
         value={currency}
         onChange={(e) => setCurrency(e.target.value)}
         aria-label="Currency"
-        className="field py-1.5"
+        className="select py-1.5"
       >
         {["TRY", "USD", "EUR", "GBP"].map((c) => (
           <option key={c}>{c}</option>

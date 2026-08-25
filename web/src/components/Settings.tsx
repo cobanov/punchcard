@@ -126,7 +126,7 @@ export function Settings({
           <select
             value={tz}
             onChange={(e) => setTz(e.target.value)}
-            className="field w-full max-w-xs py-1.5"
+            className="select w-full max-w-xs py-1.5"
           >
             {zones(tz).map((z) => (
               <option key={z} value={z}>
