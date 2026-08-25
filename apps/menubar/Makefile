@@ -133,10 +133,15 @@ zip:
 
 # --- Install ------------------------------------------------------------
 
-# Unsigned on purpose: a locally built app runs fine on the machine that built
-# it, and requiring a signature to try your own work is friction for nothing.
-# Signing is for handing the app to someone else — `make sign` or `make notarize`.
-install: bundle
+# Depends on sign, NOT bundle.
+#
+# bundle rebuilds, and rebuilding replaces the binary — which strips whatever
+# signature was on it. An `install: bundle` here installed an app carrying a
+# bundle signature over unsigned contents, which Gatekeeper reports as "code has
+# no resources but signature indicates they must be present". Signing is
+# non-interactive on this machine, so there is no reason for an unsigned path to
+# exist at all.
+install: sign
 	@pkill -x $(APP) || true
 	@rm -rf /Applications/punchcard.app
 	cp -R $(APP_BUNDLE) /Applications/punchcard.app

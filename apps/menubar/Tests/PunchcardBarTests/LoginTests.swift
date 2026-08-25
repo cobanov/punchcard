@@ -18,3 +18,16 @@ import Testing
 @Test func rejectsAnEmptyCode() {
     #expect(Login.parseCode(fromRequestLine: "GET /callback?code= HTTP/1.1\r\n\r\n") == nil)
 }
+
+// The listener has to report the port the OS actually gave it.
+//
+// NWListener created with `.any` answers `port` with 0 — not nil — until it
+// reaches .ready. A nil check therefore passes immediately and the callback URL
+// comes out as 127.0.0.1:0, which every browser refuses: ERR_UNSAFE_PORT. That
+// is how this shipped, and it is why readiness is awaited rather than polled.
+@Test func listenerReportsARealPort() async throws {
+    let (port, _) = try await Login.startListener()
+    defer { Login.stopListener() }
+    #expect(port != 0)
+    #expect(port > 1024)
+}

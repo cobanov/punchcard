@@ -36,8 +36,8 @@ enum Login {
 
     /// Runs the whole flow and returns a device token.
     static func run(baseURL: URL) async throws -> String {
-        let (port, codes) = try await listen()
-        defer { stop() }
+        let (port, codes) = try await startListener()
+        defer { stopListener() }
 
         let redirect = "http://127.0.0.1:\(port)/callback"
         var components = URLComponents(url: baseURL.appendingPathComponent("/v1/auth/oauth/github"),
@@ -61,7 +61,15 @@ enum Login {
 
     private nonisolated(unsafe) static var listener: NWListener?
 
-    private static func listen() throws -> (UInt16, AsyncStream<String>) {
+    /// The listener runs on its own queue, never the main one.
+    ///
+    /// NWListener reports readiness and accepts connections on the queue it was
+    /// started with. Using `.main` and then waiting for readiness from the main
+    /// thread is a deadlock: the callback that would end the wait cannot run
+    /// until the wait ends.
+    private static let queue = DispatchQueue(label: "run.cobanov.punchcard.bar.login")
+
+    static func startListener() async throws -> (UInt16, AsyncStream<String>) {
         let params = NWParameters.tcp
         params.requiredInterfaceType = .loopback
         let l: NWListener
@@ -77,7 +85,7 @@ enum Login {
         let sink = continuation!
 
         l.newConnectionHandler = { connection in
-            connection.start(queue: .main)
+            connection.start(queue: queue)
             connection.receive(minimumIncompleteLength: 1, maximumLength: 8192) { data, _, _, _ in
                 let request = String(decoding: data ?? Data(), as: UTF8.self)
                 let code = parseCode(fromRequestLine: request)
@@ -97,25 +105,50 @@ enum Login {
                 sink.finish()
             }
         }
-        l.start(queue: .main)
-
-        // NWListener assigns the port asynchronously; wait for it briefly rather
-        // than guessing one, because a guessed port is a port something else may
-        // already hold.
-        var waited = 0
-        while l.port?.rawValue == nil && waited < 200 {
-            usleep(10_000)
-            waited += 1
+        // Wait for .ready, then read the port. Before .ready the listener still
+        // answers `port` — with 0, the placeholder for "any" — so a nil check
+        // passes and the callback URL comes out as 127.0.0.1:0, which browsers
+        // refuse outright (ERR_UNSAFE_PORT).
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let resumed = Resumed()
+            l.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    if resumed.claim() { continuation.resume() }
+                case .failed(let error), .waiting(let error):
+                    if resumed.claim() {
+                        continuation.resume(throwing: LoginError.listener(error.localizedDescription))
+                    }
+                default:
+                    break
+                }
+            }
+            l.start(queue: queue)
         }
-        guard let port = l.port?.rawValue else {
-            throw LoginError.listener("no port was assigned")
+
+        guard let port = l.port?.rawValue, port != 0 else {
+            throw LoginError.listener("the listener started without a port")
         }
         return (port, stream)
     }
 
-    private static func stop() {
+    static func stopListener() {
         listener?.cancel()
         listener = nil
+    }
+
+    /// A continuation may be resumed exactly once. NWListener can report
+    /// .waiting and then .failed for the same problem, so the second report has
+    /// to be dropped rather than crash the app.
+    private final class Resumed: @unchecked Sendable {
+        private let lock = NSLock()
+        private var done = false
+        func claim() -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            if done { return false }
+            done = true
+            return true
+        }
     }
 
     /// Pulls `code` out of the request line of a minimal HTTP request.
