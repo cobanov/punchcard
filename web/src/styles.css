@@ -12,6 +12,16 @@
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 
+/* Dark, and only dark.
+ *
+ * Not a default — a decision. The landing page is dark because the whole visual
+ * idea is light coming through punched holes, and that needs a dark room. An
+ * app that flipped to white the moment someone signed in would make the product
+ * change identity on the way through its own front door, which is exactly what
+ * it did until this was removed.
+ *
+ * A light theme can come back as something a person chooses in settings. It
+ * should not arrive because their laptop is set that way. */
 @theme {
   /* Cool graphite, one warm accent.
    *
@@ -51,27 +61,9 @@
   --hour: 2.25rem;
 }
 
-@media (prefers-color-scheme: light) {
-  @theme {
-    --color-ink: #fbfbfc;
-    --color-card: #ffffff;
-    --color-raise: #f1f2f4;
-    --color-line: #e4e6ea;
-    --color-line-strong: #d3d6dc;
-    --color-text: #13151a;
-    --color-dim: #5f6570;
-    --color-faint: #9198a3;
-    --color-punch: #b8690a;
-    --color-punch-deep: #edd9b8;
-    --color-ghost: #cbcfd6;
-    --color-solid: #16181d;
-    --color-solid-fg: #fbfbfc;
-  }
-}
-
 @layer base {
   html {
-    color-scheme: dark light;
+    color-scheme: dark;
     scroll-behavior: smooth;
   }
 

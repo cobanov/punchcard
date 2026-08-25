@@ -90,10 +90,13 @@ export function DayCard({ sessions, commits, clusters, projects, onRecover, now 
           className="absolute inset-x-0 flex items-start gap-3"
           style={{ top: pos(h - first) }}
         >
-          <span className="tnum w-6 shrink-0 text-right font-mono text-[10px] leading-none text-faint">
+          <span className="tnum w-6 shrink-0 text-right font-mono text-[10px] leading-none text-faint/70">
             {String(h).padStart(2, "0")}
           </span>
-          <div className="mt-[0.35em] h-px flex-1 bg-line" />
+          {/* The rail is a scale, not a table. Full-width rules turned the day
+              into ruled paper and made the sessions look like annotations on
+              it, so the line stops short and sits at a third of its weight. */}
+          <div className="mt-[0.35em] h-px w-3 bg-line" />
         </div>
       ))}
 
