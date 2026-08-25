@@ -10,7 +10,16 @@ import {
   type ProjectTotal,
   type Session,
 } from "./lib/api";
-import { daysAgo, money, startOfToday, total } from "./lib/format";
+import {
+  addDays,
+  dayName,
+  daysAgo,
+  isToday,
+  money,
+  startOfToday,
+  toDateInput,
+  total,
+} from "./lib/format";
 import { SessionList, UnmatchedList } from "./components/SessionList";
 import { Projects } from "./components/Projects";
 import { TimerBar } from "./components/TimerBar";
@@ -20,6 +29,10 @@ type View = "today" | "projects" | "reports";
 export function App() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [view, setView] = useState<View>("today");
+  // The day on screen. Sessions, commits and the stats strip all describe it;
+  // the timer and the week number are global and fetched on their own.
+  const [day, setDay] = useState<Date>(startOfToday());
+  const [current, setCurrent] = useState<Session | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [commits, setCommits] = useState<Record<string, Commit[]>>({});
@@ -29,7 +42,6 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const current = sessions.find((s) => s.running) ?? null;
   const projectName = useCallback(
     (id: string) => projects.find((p) => p.id === id)?.name ?? "—",
     [projects],
@@ -37,13 +49,18 @@ export function App() {
 
   const load = useCallback(async () => {
     try {
-      const [loadedProjects, loadedSessions, loadedGithub] = await Promise.all([
+      const [loadedProjects, loadedCurrent, loadedSessions, loadedGithub] = await Promise.all([
         api.projects(),
-        api.sessions(startOfToday(), new Date(Date.now() + 60_000)),
+        // The running timer is fetched on its own, not derived from the day's
+        // sessions — browsing yesterday must not make a running timer vanish
+        // from the bar.
+        api.current(),
+        api.sessions(day, addDays(day, 1)),
         api.github(),
       ]);
       setSignedIn(true);
       setProjects(loadedProjects);
+      setCurrent(loadedCurrent);
       setSessions(loadedSessions);
       setGithub(loadedGithub);
       setError(null);
@@ -76,11 +93,25 @@ export function App() {
       }
       setError((e as Error).message);
     }
-  }, []);
+  }, [day]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Day navigation from the keyboard: ← → move a day, t returns to today.
+  // Only when nothing is focused — arrows inside an input mean the input.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+      if (e.key === "ArrowLeft") setDay((d) => addDays(d, -1));
+      if (e.key === "ArrowRight") setDay((d) => (isToday(d) ? d : addDays(d, 1)));
+      if (e.key === "t") setDay(startOfToday());
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // The server's event stream: a timer started from the CLI or the menu bar
   // shows up here at once. Polling stays as the fallback for a dropped stream.
@@ -156,10 +187,18 @@ export function App() {
             busy={busy}
           />
 
-          <StatsStrip sessions={sessions} commits={commits} weekSeconds={weekSeconds} />
+          <StatsStrip day={day} sessions={sessions} commits={commits} weekSeconds={weekSeconds} />
 
-          <section className="panel mt-3 overflow-hidden" aria-label="Today's sessions">
-            <SessionList sessions={sessions} commits={commits} projects={projects} />
+          <section className="panel mt-3 overflow-hidden" aria-label="Sessions">
+            <DayNav day={day} onChange={setDay} />
+            <SessionList
+              sessions={sessions}
+              commits={commits}
+              projects={projects}
+              busy={busy}
+              onSave={(id, body) => void act(() => api.updateSession(id, body))}
+              onDelete={(id) => void act(() => api.deleteSession(id))}
+            />
           </section>
 
           <UnmatchedList
@@ -194,16 +233,18 @@ export function App() {
  * a look, not a navigation.
  */
 function StatsStrip({
+  day,
   sessions,
   commits,
   weekSeconds,
 }: {
+  day: Date;
   sessions: Session[];
   commits: Record<string, Commit[]>;
   weekSeconds: number | null;
 }) {
   const finished = sessions.filter((s) => !s.running);
-  const todaySeconds = finished.reduce((sum, s) => sum + s.seconds, 0);
+  const daySeconds = finished.reduce((sum, s) => sum + s.seconds, 0);
   const commitCount = finished.reduce((sum, s) => sum + (commits[s.id]?.length ?? 0), 0);
 
   const item = (label: string, value: string) => (
@@ -215,10 +256,57 @@ function StatsStrip({
 
   return (
     <div className="mt-3 flex flex-wrap items-baseline gap-x-5 gap-y-1 px-1">
-      {item("today", total(todaySeconds))}
+      {item(isToday(day) ? "today" : dayName(day), total(daySeconds))}
       {item("week", weekSeconds === null ? "—" : total(weekSeconds))}
       {item("commits", String(commitCount))}
     </div>
+  );
+}
+
+/**
+ * Browsing the calendar. Arrows walk a day at a time (also ← → on the
+ * keyboard, t for today), the native date input jumps anywhere — no picker
+ * library, the platform already has one and it matches the OS.
+ */
+function DayNav({ day, onChange }: { day: Date; onChange: (d: Date) => void }) {
+  const today = isToday(day);
+  return (
+    <header className="flex items-center gap-1.5 border-b border-line px-2 py-1.5">
+      <button
+        onClick={() => onChange(addDays(day, -1))}
+        aria-label="Previous day"
+        className="btn-bare px-1.5 text-[14px] leading-none"
+      >
+        ‹
+      </button>
+      <button
+        onClick={() => onChange(addDays(day, 1))}
+        disabled={today}
+        aria-label="Next day"
+        className="btn-bare px-1.5 text-[14px] leading-none disabled:opacity-30"
+      >
+        ›
+      </button>
+      <input
+        type="date"
+        value={toDateInput(day)}
+        max={toDateInput(new Date())}
+        onChange={(e) => {
+          // An empty value is the input being cleared, not a day.
+          if (e.target.value) onChange(new Date(`${e.target.value}T00:00:00`));
+        }}
+        aria-label="Go to date"
+        className="field border-0 bg-transparent py-0.5 font-mono text-[12px] text-dim"
+      />
+      <span className="text-[12px] font-medium text-text">
+        {today ? "Today" : dayName(day)}
+      </span>
+      {!today && (
+        <button onClick={() => onChange(startOfToday())} className="btn-ghost ml-auto py-0.5 text-[11px]">
+          Today
+        </button>
+      )}
+    </header>
   );
 }
 

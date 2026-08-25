@@ -57,4 +57,33 @@ export const startOfToday = () => {
 
 export const daysAgo = (n: number) => new Date(Date.now() - n * 864e5);
 
+/** Midnight at the start of the given date's day. */
+export function dayStart(d: Date): Date {
+  const out = new Date(d);
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
+
+/** Calendar-day addition — setDate, not +86400s, so DST cannot skip a day. */
+export function addDays(d: Date, n: number): Date {
+  const out = new Date(d);
+  out.setDate(out.getDate() + n);
+  return out;
+}
+
+export const isToday = (d: Date) => dayStart(d).getTime() === startOfToday().getTime();
+
+/** "Mon 25 Aug" — the header label for a browsed day. */
+export const dayName = (d: Date) =>
+  d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+
+/** The value/format a native date input speaks. Local, not UTC — toISOString
+ *  would shift the day for anyone east of Greenwich. */
+export function toDateInput(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export const firstLine = (s: string) => s.split("\n")[0]?.trim() ?? "";

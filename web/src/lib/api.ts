@@ -153,6 +153,18 @@ export const api = {
   sessions: (from: Date, to: Date) =>
     call<{ sessions: Session[] }>(`/v1/sessions?${range(from, to)}`).then((r) => r.sessions),
 
+  /** The running session, or null. The server answers 404 for "nothing
+   *  running", which is a state rather than a failure — translated here so no
+   *  call site has to catch it. */
+  current: async (): Promise<Session | null> => {
+    try {
+      return await call<Session>("/v1/sessions/current");
+    } catch (e) {
+      if (e instanceof APIError && e.status === 404) return null;
+      throw e;
+    }
+  },
+
   start: (project_id: string, note: string) =>
     call<Session>("/v1/sessions", { method: "POST", body: { project_id, note } }),
 

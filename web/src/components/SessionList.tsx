@@ -5,40 +5,37 @@ import { firstLine, hhmm, total } from "../lib/format";
 /**
  * The day, as rows.
  *
- * This replaces the drawn timeline. The timeline was the design's one big
- * swing, and it lost on the terms that matter for this product: rows collided
- * when sessions were close together, short sessions were unreadable, and a
- * normal two-session day looked like an empty chart. A tool you open for ten
- * seconds cannot ask to be interpreted.
+ * This replaced the drawn timeline: rows collided, short sessions were
+ * unreadable, and a tool you open for ten seconds cannot ask to be interpreted.
+ * What survives is the vocabulary — amber means evidence — not the geometry.
  *
- * What survives from it is the vocabulary, not the geometry: a session with
- * commits carries amber evidence, and work no timer covered still appears —
- * as a quiet dashed card offering to become a record, not as a diagram.
- *
- * Rows are newest first, because the question a glance answers is "what was I
- * just doing". Clicking a row opens its commits; everything else about a row is
- * legible without touching it.
+ * Rows are newest first, because the glance answers "what was I just doing".
+ * A row expands on click into everything behind it: its commits, and the
+ * controls to correct it. Editing lives inside the row rather than in a modal,
+ * because a correction is a small thing and the UI should treat it as one.
  */
 
 interface Props {
   sessions: Session[];
   commits: Record<string, Commit[]>;
   projects: Project[];
+  onSave: (id: string, body: Record<string, unknown>) => void;
+  onDelete: (id: string) => void;
+  busy: boolean;
 }
 
-export function SessionList({ sessions, commits, projects }: Props) {
+export function SessionList({ sessions, commits, projects, onSave, onDelete, busy }: Props) {
   const [open, setOpen] = useState<string | null>(null);
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? "—";
 
-  // The running session is the timer bar's job. Showing it here too would put
-  // the same fact on screen twice and make the reader check whether they agree.
+  // The running session is the timer bar's job; here it would be the same fact
+  // twice. Browsed days never contain it, so this only bites on today.
   const finished = sessions.filter((s) => !s.running);
 
   if (!finished.length) {
     return (
       <p className="px-3 py-6 text-center text-faint">
-        Nothing recorded yet today. Start a timer above — sessions land here when
-        you stop them.
+        Nothing recorded this day.
       </p>
     );
   }
@@ -69,15 +66,16 @@ export function SessionList({ sessions, commits, projects }: Props) {
             </button>
 
             {expanded && (
-              <div className="border-t border-line/60 bg-ink/40 px-3 py-2 pl-[6.25rem]">
-                {own.length === 0 ? (
-                  <p className="text-[12px] text-faint">
-                    {session.commit_sync_state === "pending"
-                      ? "Still looking for commits."
-                      : "No commits were pushed during this session."}
-                  </p>
-                ) : (
-                  <ul className="space-y-1">
+              <div className="space-y-2 border-t border-line/60 bg-ink/40 px-3 py-2.5">
+                <EditRow
+                  session={session}
+                  projects={projects}
+                  onSave={(body) => onSave(session.id, body)}
+                  onDelete={() => onDelete(session.id)}
+                  busy={busy}
+                />
+                {own.length > 0 && (
+                  <ul className="space-y-1 pt-1">
                     {own.map((commit) => (
                       <li key={commit.sha} className="flex items-baseline gap-2.5 text-[12px]">
                         <a
@@ -107,8 +105,120 @@ export function SessionList({ sessions, commits, projects }: Props) {
   );
 }
 
-/** The evidence, at a glance. Amber only when there is any — a zero would put
- *  the accent on every row and drain it of meaning. */
+/**
+ * The correction controls: project, note, start, end, save — and delete, held
+ * apart on the right so it cannot be hit reaching for save.
+ *
+ * Times are edited as clock times on the session's own day; the date part is
+ * taken from the record, so correcting yesterday's entry from today cannot drag
+ * it to today. The server re-scans commits by itself when the window moves.
+ */
+function EditRow({
+  session,
+  projects,
+  onSave,
+  onDelete,
+  busy,
+}: {
+  session: Session;
+  projects: Project[];
+  onSave: (body: Record<string, unknown>) => void;
+  onDelete: () => void;
+  busy: boolean;
+}) {
+  const [projectID, setProjectID] = useState(session.project_id);
+  const [note, setNote] = useState(session.note);
+  const [start, setStart] = useState(timeInput(session.started_at));
+  const [end, setEnd] = useState(session.ended_at ? timeInput(session.ended_at) : "");
+
+  const dirty =
+    projectID !== session.project_id ||
+    note !== session.note ||
+    start !== timeInput(session.started_at) ||
+    (session.ended_at !== null && end !== timeInput(session.ended_at));
+
+  const save = () => {
+    const body: Record<string, unknown> = {};
+    if (projectID !== session.project_id) body.project_id = projectID;
+    if (note !== session.note) body.note = note;
+    if (start !== timeInput(session.started_at)) {
+      body.started_at = onDay(session.started_at, start);
+    }
+    if (session.ended_at && end !== timeInput(session.ended_at)) {
+      body.ended_at = onDay(session.ended_at, end);
+    }
+    if (Object.keys(body).length) onSave(body);
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <select
+        value={projectID}
+        onChange={(e) => setProjectID(e.target.value)}
+        aria-label="Project"
+        className="field max-w-[9rem] py-0.5 text-[12px]"
+      >
+        {projects.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+      <input
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && save()}
+        placeholder="What was this?"
+        aria-label="Note"
+        className="field min-w-32 flex-1 py-0.5 text-[12px]"
+      />
+      <input
+        type="time"
+        value={start}
+        onChange={(e) => setStart(e.target.value)}
+        aria-label="Start time"
+        className="field py-0.5 font-mono text-[12px]"
+      />
+      <span className="text-faint">–</span>
+      <input
+        type="time"
+        value={end}
+        onChange={(e) => setEnd(e.target.value)}
+        aria-label="End time"
+        disabled={!session.ended_at}
+        className="field py-0.5 font-mono text-[12px]"
+      />
+      <button onClick={save} disabled={busy || !dirty} className="btn-ghost py-0.5 text-[12px]">
+        Save
+      </button>
+      <button
+        onClick={() => confirm("Delete this session? Its commits become unmatched again.") && onDelete()}
+        disabled={busy}
+        className="btn-bare ml-auto text-[12px] hover:text-punch"
+      >
+        Delete
+      </button>
+    </div>
+  );
+}
+
+/** ISO timestamp → the HH:MM a time input speaks, in local time. */
+function timeInput(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** A clock time re-applied to the timestamp's own calendar day. */
+function onDay(iso: string, hhmmValue: string): string {
+  const d = new Date(iso);
+  const [h, m] = hhmmValue.split(":").map(Number);
+  d.setHours(h ?? 0, m ?? 0, 0, 0);
+  return d.toISOString();
+}
+
+/** The evidence, at a glance. Amber only when there is any — a zero on every
+ *  row would drain the accent of meaning. Commits are optional garnish here,
+ *  not structure: a session without them is a complete record. */
 function CommitBadge({ count, syncState }: { count: number; syncState: string }) {
   if (count > 0) {
     return (
@@ -124,11 +234,9 @@ function CommitBadge({ count, syncState }: { count: number; syncState: string })
 }
 
 /**
- * Work that happened while no timer was running.
- *
- * One card per stretch, one press to record it. The project is pre-picked when
- * the guess is safe (one repository, one project) and left to the select when
- * it is not — recording under the wrong client is worse than one extra click.
+ * Work that happened while no timer was running. One card per stretch, one
+ * press to record it; the project select is on the card because recording under
+ * the wrong client is worse than one extra click.
  */
 export function UnmatchedList({
   clusters,
@@ -187,7 +295,7 @@ function UnmatchedRow({
       <span className="min-w-0 flex-1 truncate text-[12px] text-dim">
         <span className="text-text">{n} commit{n === 1 ? "" : "s"}</span>
         {" · "}
-        {dayLabel(cluster.from)}
+        {clusterDayLabel(cluster.from)}
         {hhmm(cluster.from)}–{hhmm(cluster.to)} · no timer was running ·{" "}
         <span className="font-mono text-[11px]">{repos}</span>
       </span>
@@ -214,9 +322,8 @@ function UnmatchedRow({
   );
 }
 
-/** "12 Aug " when the stretch is from another day, nothing when it is today's.
- *  Recovery covers a week, and Friday's forgotten timer needs its date. */
-function dayLabel(iso: string): string {
+/** "12 Aug " when the stretch is from another day; nothing when today's. */
+function clusterDayLabel(iso: string): string {
   const d = new Date(iso);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
