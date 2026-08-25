@@ -2,7 +2,6 @@
 //
 //	serve       run the HTTP API server (and, later, MCP HTTP + River workers)
 //	migrate     apply (up) or roll back (down) database migrations
-//	mcp-stdio   run the MCP server over stdio (implemented in Phase 4)
 //	version     print the build version
 package main
 
@@ -17,7 +16,6 @@ import (
 	"github.com/cobanov/punchcard/internal/config"
 	"github.com/cobanov/punchcard/internal/email"
 	apphttp "github.com/cobanov/punchcard/internal/http"
-	appmcp "github.com/cobanov/punchcard/internal/mcp"
 	"github.com/cobanov/punchcard/internal/oauth"
 	"github.com/cobanov/punchcard/internal/observability"
 	"github.com/cobanov/punchcard/internal/repo"
@@ -46,8 +44,6 @@ func run() int {
 		return exit(cmdServe(ctx))
 	case "migrate":
 		return exit(cmdMigrate(ctx, os.Args[2:]))
-	case "mcp-stdio":
-		return exit(cmdMCPStdio(ctx))
 	case "version", "--version", "-v":
 		fmt.Printf("punchcard %s\n", version)
 		return 0
@@ -171,20 +167,8 @@ func cmdMigrate(ctx context.Context, args []string) error {
 	}
 }
 
-func cmdMCPStdio(ctx context.Context) error {
-	base := os.Getenv("TODO_API_BASE_URL")
-	if base == "" {
-		base = "http://localhost:8080"
-	}
-	pat := os.Getenv("TODO_API_TOKEN")
-	if pat == "" {
-		return fmt.Errorf("TODO_API_TOKEN is required for mcp-stdio")
-	}
-	return appmcp.RunStdio(ctx, base, pat)
-}
-
 func usage() {
-	fmt.Fprint(os.Stderr, `punchcard — agent-native todo service
+	fmt.Fprint(os.Stderr, `punchcard — developer time tracking
 
 Usage:
   punchcard <command> [args]
@@ -192,7 +176,6 @@ Usage:
 Commands:
   serve                 Run the HTTP API server
   migrate [up|down]     Apply or roll back database migrations (default: up)
-  mcp-stdio             Run the MCP server over stdio (Phase 4)
   version               Print the build version
   help                  Show this help
 

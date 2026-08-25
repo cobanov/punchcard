@@ -41,10 +41,6 @@ run: ## Run the server (loads ./.env if present)
 test: ## Run all tests (needs Docker or TEST_DATABASE_URL)
 	go test -race -count=1 $(PKG)
 
-.PHONY: web
-web: ## Build the web UI into internal/http/embedded/dist (commit the result)
-	cd web && npm install && npm run build
-
 .PHONY: sqlc
 sqlc: ## Regenerate sqlc code from db/queries + db/migrations
 	$(GOBIN)/sqlc generate
@@ -93,49 +89,6 @@ docker-up: ## Start the self-host stack (app + postgres + caddy)
 docker-down: ## Stop the self-host stack
 	docker compose -f deploy/docker-compose.yml down
 
-.PHONY: ios-core
-ios-core: ## Test the iOS widget's resolve rules (pure Swift, no simulator)
-# On a Mac this must never quietly pass having run nothing — that is the exact
-# failure mode CLAUDE.md warns about for DOCKER_HOST. Elsewhere there is no
-# Swift toolchain to have, so it says so and moves on.
-	@if [ "$$(uname -s)" != "Darwin" ]; then \
-		echo "SKIPPED ios-core: not macOS, no Swift toolchain"; \
-	else \
-		command -v swift >/dev/null 2>&1 || { echo "ios-core: swift not found on macOS"; exit 1; }; \
-		cd web/src-tauri/ios/widget/HelvaWidgetCore && swift test; \
-	fi
-
-.PHONY: web-unit
-web-unit: ## Frontend typecheck + unit checks that need no browser and no server
-# `tsc -b` is first because until 2026-08-14 it was not here at all, and nothing
-# else in the gate ran it: `npm run lint` is oxlint (which does not typecheck)
-# and the suites below are plain node. `tsc -b` lived only inside `npm run
-# build`, which only `make web` calls — and `check` does not call `make web`.
-# So a type error passed the one gate this project has. It covers web/src AND
-# web/extension/src, both projects of the solution-style web/tsconfig.json.
-#
-# Then two suites, both pure node — no node_modules, no browser, and Node >= 22
-# strips the .ts imports itself:
-#
-#   position.mjs  the TS port must still match internal/service/position.go.
-#                 The Go half runs under `test`, so a change to position.go is
-#                 already caught; this is the other direction. Without it an
-#                 edit to web/src/offline/position.ts drifts silently and
-#                 reorders made offline land somewhere different from the same
-#                 reorder made online.
-#   revive.mjs    the IndexedDB read boundary. A row written by an older app
-#                 version must never come back with a required field missing.
-#
-# Same rule as ios-core: it must never quietly pass having run nothing.
-	@if ! command -v node >/dev/null 2>&1; then \
-		echo "web-unit: node not found"; exit 1; \
-	fi
-	@cd web && npx tsc -b && npm run --silent lint && npm run --silent test:unit && echo "web typecheck + lint clean"
-
-.PHONY: version-parity
-version-parity: ## Fail if the four files carrying the app version disagree
-	@./scripts/version-parity.sh
-
 .PHONY: check
-check: vet lint sec vuln openapi-check test ios-core web-unit version-parity build ## Run the full local gate (mirrors CI)
+check: vet lint sec vuln openapi-check test build ## Run the full local gate (mirrors CI)
 	@echo "all checks passed"

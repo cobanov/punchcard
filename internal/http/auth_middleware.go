@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/cobanov/punchcard/internal/activity"
 	"github.com/cobanov/punchcard/internal/auth"
 )
 
@@ -40,7 +39,6 @@ func (d Deps) authMiddleware(next http.Handler) http.Handler {
 				return
 			}
 			ctx = withPrincipal(ctx, p)
-			ctx = activity.WithOrigin(ctx, originOf(p, r))
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
@@ -59,7 +57,6 @@ func (d Deps) authMiddleware(next http.Handler) http.Handler {
 					return
 				}
 				ctx = withPrincipal(ctx, p)
-				ctx = activity.WithOrigin(ctx, originOf(p, r))
 			}
 		}
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -76,15 +73,6 @@ func (d Deps) authMiddleware(next http.Handler) http.Handler {
 // any other program holding that token. It is honoured only for a PAT and only
 // for the value "mcp"; nothing can claim "agent", which the chat handler sets
 // in-process. Worst case a token holder mislabels rows in their own log.
-func originOf(p *auth.Principal, r *http.Request) activity.Origin {
-	if p == nil || p.TokenID == nil || p.ViaDevice {
-		return activity.User
-	}
-	if r.Header.Get(activity.HeaderOrigin) == string(activity.MCP) {
-		return activity.MCP
-	}
-	return activity.API
-}
 
 func isUnsafeMethod(m string) bool {
 	switch m {

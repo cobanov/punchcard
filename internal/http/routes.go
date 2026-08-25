@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"net"
-	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
@@ -13,10 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/cobanov/punchcard/internal/config"
-	"github.com/cobanov/punchcard/internal/gemini"
-	"github.com/cobanov/punchcard/internal/http/embedded"
 	"github.com/cobanov/punchcard/internal/http/legal"
-	appmcp "github.com/cobanov/punchcard/internal/mcp"
 	"github.com/cobanov/punchcard/internal/oauth"
 	"github.com/cobanov/punchcard/internal/observability"
 	"github.com/cobanov/punchcard/internal/ratelimit"
@@ -44,7 +40,6 @@ type Deps struct {
 	Auth        *service.Auth
 	Domain      *service.Domain
 	OAuth       *oauth.Providers
-	Gemini      *gemini.Client
 	AuthLimiter ratelimit.Limiter
 	APILimiter  ratelimit.Limiter
 	sseHub      *sseHub
@@ -73,14 +68,6 @@ func BuildRouter(d Deps) (*chi.Mux, huma.API) {
 	}
 	if d.OAuth == nil {
 		d.OAuth = oauth.New(d.Config)
-	}
-	// Defaulted here rather than in main so a partial Deps (OpenAPI generation,
-	// tests) still gets a client. With no key it reports Enabled()==false and
-	// the chat route answers 503 with a reason — the route exists either way,
-	// because an endpoint that is present on one deployment and absent on
-	// another is harder to diagnose than one that explains itself.
-	if d.Gemini == nil {
-		d.Gemini = gemini.New(d.Config.GeminiAPIKey, d.Config.GeminiModel)
 	}
 	if d.trustedProxyNets == nil {
 		if len(d.Config.TrustedProxies) > 0 {
@@ -126,17 +113,9 @@ func BuildRouter(d Deps) (*chi.Mux, huma.API) {
 	api := humachi.New(r, humaConfig(d.Config))
 	d.registerAuthRoutes(api)
 	d.registerMeRoutes(api)
-	d.registerListRoutes(api)
-	d.registerTaskRoutes(api)
-	d.registerChangesRoute(api)
 	d.registerAccountRoutes(api)
 	d.registerWebhookRoutes(api)
-	d.registerChatRoutes(api)
-	d.registerActivityRoute(api)
 
-	// MCP streamable-HTTP transport. Tools call the REST API on the
-	// loopback interface with the caller's Bearer PAT.
-	r.Mount("/mcp", appmcp.HTTPHandler(internalBaseURL(d.Config)))
 
 	// Legal documents. Public, unauthenticated, and served as their own HTML
 	// rather than as SPA routes: App Store Connect requires a reachable privacy
@@ -148,29 +127,14 @@ func BuildRouter(d Deps) (*chi.Mux, huma.API) {
 	// support page — a mailto: link there is a routine rejection.
 	r.Get("/support", legal.Handler("support.html"))
 
-	// Embedded web UI: anything not matched above falls through to
-	// the SPA, which serves its own assets and index.html for client routes.
-	r.NotFound(embedded.Handler().ServeHTTP)
 
 	return r, api
-}
-
-// internalBaseURL is the loopback URL the process uses to call its own API.
-func internalBaseURL(cfg *config.Config) string {
-	addr := cfg.HTTPAddr
-	if i := strings.LastIndex(addr, ":"); i >= 0 {
-		return "http://127.0.0.1" + addr[i:]
-	}
-	return "http://127.0.0.1:8080"
 }
 
 // humaConfig returns the OpenAPI/huma configuration for the API.
 func humaConfig(cfg *config.Config) huma.Config {
 	c := huma.DefaultConfig("punchcard", apiVersion)
-	c.Info.Description = "Agent-native todo service. API-first: anything the UI can do, the API can do."
-	// huma's built-in interactive explorer defaults to /docs; move it so /docs
-	// can serve the human-friendly single-page guide (internal/http/embedded).
-	c.DocsPath = "/api-explorer"
+	c.Info.Description = "Developer time tracking. Projects, work sessions and the GitHub commits behind them."
 	if cfg != nil && cfg.PublicBaseURL != "" {
 		c.Servers = []*huma.Server{{URL: cfg.PublicBaseURL}}
 	}
