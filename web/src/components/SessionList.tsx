@@ -417,11 +417,16 @@ function UnmatchedRow({
 }
 
 /**
- * The agent runs filed against a session.
+ * The agent runs filed against a session, summarised.
  *
  * Fetched when the row opens rather than with the day: this is the only place
  * they appear, and loading them for every session on every day view would
  * double the requests to show something nobody had asked to see yet.
+ *
+ * One line per repository, not per turn. A two-hour session holds forty turns,
+ * most of them a minute or two, and listing them was forty rows of noise to say
+ * one thing: an agent worked here, this long. The timeline above already draws
+ * the stretches; this says the total, which is the part a row in a table is for.
  *
  * They render below the commits and quieter than them, on purpose. A commit is
  * something punchcard fetched from GitHub and can prove; a run is what a local
@@ -444,23 +449,44 @@ function AgentRunList({ sessionID }: { sessionID: string }) {
 
   if (!runs?.length) return null;
 
+  const groups = new Map<
+    string,
+    { label: string; tool: string; seconds: number; turns: number; model: string; from: string; to: string }
+  >();
+  for (const r of runs) {
+    const where = r.repo || (r.cwd ? r.cwd.split("/").filter(Boolean).pop() ?? "" : "");
+    const key = `${r.tool}|${where}`;
+    const g = groups.get(key);
+    if (!g) {
+      groups.set(key, {
+        label: where, tool: r.tool, seconds: r.seconds, turns: 1,
+        model: r.model ?? "", from: r.started_at, to: r.ended_at,
+      });
+      continue;
+    }
+    g.seconds += r.seconds;
+    g.turns += 1;
+    if (r.model) g.model = r.model;
+    if (r.started_at < g.from) g.from = r.started_at;
+    if (r.ended_at > g.to) g.to = r.ended_at;
+  }
+  const rows = [...groups.values()].sort((a, b) => b.seconds - a.seconds);
+
   return (
     <div className="pt-1.5">
       <p className="eyebrow mb-1">Reported by agents</p>
       <ul className="space-y-1">
-        {runs.map((run, i) => (
-          <li key={`${run.tool}-${run.started_at}-${i}`} className="flex items-baseline gap-2.5 t-caption text-faint">
-            <span className="shrink-0 font-mono text-dim">{run.tool}</span>
-            <span className="shrink-0 tnum font-mono">
-              {hhmm(run.started_at)}–{hhmm(run.ended_at)}
+        {rows.map((g, i) => (
+          <li key={`${g.tool}-${g.label}-${i}`} className="flex items-baseline gap-2.5 t-caption text-faint">
+            <span className="shrink-0 font-mono text-dim">{g.tool}</span>
+            {g.label && <span className="min-w-0 truncate font-mono">{g.label}</span>}
+            <span className="tnum ml-auto shrink-0 font-mono">
+              {hhmm(g.from)}–{hhmm(g.to)}
             </span>
-            <span className="shrink-0 tnum">{total(run.seconds)}</span>
-            {run.model && <span className="min-w-0 truncate font-mono">{run.model}</span>}
-            {run.tool_calls != null && (
-              <span className="ml-auto shrink-0 tnum">
-                {run.tool_calls} tool{run.tool_calls === 1 ? "" : "s"}
-              </span>
-            )}
+            <span className="tnum shrink-0 text-dim">{total(g.seconds)}</span>
+            <span className="tnum shrink-0">
+              {g.turns} turn{g.turns === 1 ? "" : "s"}
+            </span>
           </li>
         ))}
       </ul>
