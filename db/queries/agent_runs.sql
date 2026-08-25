@@ -73,3 +73,12 @@ WHERE ar.user_id = sqlc.arg(user_id)
   AND ar.started_at >= sqlc.arg(from_ts)::timestamptz
   AND ar.started_at <= sqlc.arg(to_ts)::timestamptz
 ORDER BY ar.started_at ASC;
+
+-- Every run in a window, matched or not — the feed behind the day view, where
+-- what actually ran is drawn under what was declared.
+-- name: ListAgentRunsInWindow :many
+SELECT * FROM agent_runs
+WHERE user_id = sqlc.arg(user_id)
+  AND started_at >= sqlc.arg(from_ts)::timestamptz
+  AND started_at <= sqlc.arg(to_ts)::timestamptz
+ORDER BY started_at ASC;

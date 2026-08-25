@@ -167,3 +167,14 @@ func (d *Domain) AgentRunsForSession(ctx context.Context, p *auth.Principal, ses
 	}
 	return rows, nil
 }
+
+// AgentRunsInWindow lists every run that started in a window.
+func (d *Domain) AgentRunsInWindow(ctx context.Context, p *auth.Principal, from, to time.Time) ([]db.AgentRun, error) {
+	rows, err := d.store.ListAgentRunsInWindow(ctx, db.ListAgentRunsInWindowParams{
+		UserID: p.UserID, FromTs: from.UTC(), ToTs: to.UTC(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list agent runs in window: %w", err)
+	}
+	return rows, nil
+}

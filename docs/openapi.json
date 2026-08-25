@@ -1,6 +1,33 @@
 {
   "components": {
     "schemas": {
+      "Agent-runs-listResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "http://localhost:8080/schemas/Agent-runs-listResponse.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "agent_runs": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRunDTO"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "agent_runs"
+        ],
+        "type": "object"
+      },
       "Agent-runs-recordRequest": {
         "additionalProperties": false,
         "properties": {
@@ -2164,6 +2191,77 @@
   "openapi": "3.1.0",
   "paths": {
     "/v1/agent-runs": {
+      "get": {
+        "operationId": "agent-runs-list",
+        "parameters": [
+          {
+            "description": "RFC 3339; defaults to 30 days ago.",
+            "explode": false,
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "description": "RFC 3339; defaults to 30 days ago.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "RFC 3339; defaults to now.",
+            "explode": false,
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "description": "RFC 3339; defaults to now.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Agent-runs-listResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemError"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemError"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemError"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Agent runs in a date range",
+        "tags": [
+          "agent-runs"
+        ]
+      },
       "post": {
         "description": "Batch upsert, keyed on (tool, external_id). Flushing the same queue twice is safe: the response says how many rows were new and how many were already known.",
         "operationId": "agent-runs-record",

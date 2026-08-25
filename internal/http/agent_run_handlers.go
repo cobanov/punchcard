@@ -93,6 +93,42 @@ func (d Deps) registerAgentRunRoutes(api huma.API) {
 	})
 
 	huma.Register(api, huma.Operation{
+		OperationID: "agent-runs-list", Method: http.MethodGet, Path: "/v1/agent-runs",
+		Summary: "Agent runs in a date range", Tags: []string{"agent-runs"},
+		Errors: []int{401, 422},
+	}, func(ctx context.Context, in *struct {
+		From string `query:"from" doc:"RFC 3339; defaults to 30 days ago."`
+		To   string `query:"to" doc:"RFC 3339; defaults to now."`
+	}) (*struct {
+		Body struct {
+			AgentRuns []AgentRunDTO `json:"agent_runs"`
+		}
+	}, error) {
+		p, err := requirePrincipal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		from, to, err := defaultRange(in.From, in.To)
+		if err != nil {
+			return nil, err
+		}
+		rows, err := d.Domain.AgentRunsInWindow(ctx, p, from, to)
+		if err != nil {
+			return nil, d.problem(ctx, err)
+		}
+		out := &struct {
+			Body struct {
+				AgentRuns []AgentRunDTO `json:"agent_runs"`
+			}
+		}{}
+		out.Body.AgentRuns = make([]AgentRunDTO, 0, len(rows))
+		for _, r := range rows {
+			out.Body.AgentRuns = append(out.Body.AgentRuns, agentRunDTO(r))
+		}
+		return out, nil
+	})
+
+	huma.Register(api, huma.Operation{
 		OperationID: "sessions-agent-runs", Method: http.MethodGet, Path: "/v1/sessions/{id}/agent-runs",
 		Summary: "The agent runs attributed to a session", Tags: []string{"sessions"},
 		Errors: []int{401, 404},

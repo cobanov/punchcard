@@ -225,6 +225,12 @@ export const api = {
   commits: (sessionID: string) =>
     call<{ commits: Commit[] }>(`/v1/sessions/${sessionID}/commits`).then((r) => r.commits),
 
+  /** Every run in a window, matched or not — the day strip's second band. */
+  agentRunsBetween: (from: Date, to: Date) =>
+    call<{ agent_runs: AgentRun[] }>(`/v1/agent-runs?${range(from, to)}`).then(
+      (r) => r.agent_runs ?? [],
+    ),
+
   agentRuns: (sessionID: string) =>
     call<{ agent_runs: AgentRun[] }>(`/v1/sessions/${sessionID}/agent-runs`).then(
       (r) => r.agent_runs ?? [],

@@ -181,6 +181,54 @@ func (q *Queries) ListAgentRunsForSession(ctx context.Context, sessionID uuid.UU
 	return items, nil
 }
 
+const listAgentRunsInWindow = `-- name: ListAgentRunsInWindow :many
+SELECT id, user_id, tool, external_id, started_at, ended_at, model, cwd, repo_full_name, tool_calls, created_at FROM agent_runs
+WHERE user_id = $1
+  AND started_at >= $2::timestamptz
+  AND started_at <= $3::timestamptz
+ORDER BY started_at ASC
+`
+
+type ListAgentRunsInWindowParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	FromTs time.Time `json:"from_ts"`
+	ToTs   time.Time `json:"to_ts"`
+}
+
+// Every run in a window, matched or not — the feed behind the day view, where
+// what actually ran is drawn under what was declared.
+func (q *Queries) ListAgentRunsInWindow(ctx context.Context, arg ListAgentRunsInWindowParams) ([]AgentRun, error) {
+	rows, err := q.db.Query(ctx, listAgentRunsInWindow, arg.UserID, arg.FromTs, arg.ToTs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AgentRun{}
+	for rows.Next() {
+		var i AgentRun
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Tool,
+			&i.ExternalID,
+			&i.StartedAt,
+			&i.EndedAt,
+			&i.Model,
+			&i.Cwd,
+			&i.RepoFullName,
+			&i.ToolCalls,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUnmatchedAgentRuns = `-- name: ListUnmatchedAgentRuns :many
 SELECT ar.id, ar.user_id, ar.tool, ar.external_id, ar.started_at, ar.ended_at, ar.model, ar.cwd, ar.repo_full_name, ar.tool_calls, ar.created_at FROM agent_runs ar
 LEFT JOIN session_agent_runs sar ON sar.agent_run_id = ar.id

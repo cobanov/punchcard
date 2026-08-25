@@ -216,7 +216,7 @@ export function App() {
             {/* The table says what and for how long; the strip says when, and
                 how the day broke up. Those are different questions and a list
                 only answers the first. */}
-            <DayTimeline sessions={sessions} projects={projects} />
+            <DayTimeline day={day} sessions={sessions} projects={projects} />
             <SessionList
               sessions={sessions}
               commits={commits}

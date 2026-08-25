@@ -116,6 +116,9 @@ type Querier interface {
 	LinkProjectRepo(ctx context.Context, arg LinkProjectRepoParams) (ProjectRepo, error)
 	ListActiveWebhooksForUser(ctx context.Context, arg ListActiveWebhooksForUserParams) ([]Webhook, error)
 	ListAgentRunsForSession(ctx context.Context, sessionID uuid.UUID) ([]AgentRun, error)
+	// Every run in a window, matched or not — the feed behind the day view, where
+	// what actually ran is drawn under what was declared.
+	ListAgentRunsInWindow(ctx context.Context, arg ListAgentRunsInWindowParams) ([]AgentRun, error)
 	ListAuditForUser(ctx context.Context, arg ListAuditForUserParams) ([]AuditLog, error)
 	ListAuthSessionsByUser(ctx context.Context, userID uuid.UUID) ([]AuthSession, error)
 	ListCommitsForSession(ctx context.Context, sessionID uuid.UUID) ([]Commit, error)
