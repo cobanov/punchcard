@@ -269,7 +269,7 @@ export function UnmatchedList({
 }: {
   clusters: Cluster[];
   projects: Project[];
-  onRecover: (cluster: Cluster, projectID: string) => void;
+  onRecover: (cluster: Cluster, target: RecoverTarget) => void;
   busy: boolean;
 }) {
   if (!clusters.length) return null;
@@ -288,6 +288,25 @@ export function UnmatchedList({
   );
 }
 
+/**
+ * Where a recovered stretch should be filed.
+ *
+ * Either an existing project, or one that does not exist yet — because the
+ * commits themselves name it. A stretch of work in `cobanov/herdzchat` with no
+ * project to put it under used to be a dead end: leave the app, create a
+ * project by hand, come back, and hope the suggestion was still there.
+ */
+export type RecoverTarget = { projectID: string } | { newProject: string; repo: string };
+
+/** "cobanov/herdzchat" is a project called herdzchat. The owner is the same for
+ *  every repository a person owns, so it carries no information here. */
+function repoBase(full: string): string {
+  const slash = full.lastIndexOf("/");
+  return slash === -1 ? full : full.slice(slash + 1);
+}
+
+const CREATE = "__create__";
+
 function UnmatchedRow({
   cluster,
   projects,
@@ -296,11 +315,24 @@ function UnmatchedRow({
 }: {
   cluster: Cluster;
   projects: Project[];
-  onRecover: (cluster: Cluster, projectID: string) => void;
+  onRecover: (cluster: Cluster, target: RecoverTarget) => void;
   busy: boolean;
 }) {
-  const [projectID, setProjectID] = useState(
-    cluster.suggested_project_id ?? projects[0]?.id ?? "",
+  const repo = cluster.repos[0] ?? "";
+  const suggestedName = repo ? repoBase(repo) : "";
+  // A project already named after the repository is almost certainly the one
+  // meant, even when nothing was ever linked.
+  const byName = projects.find(
+    (p) => suggestedName && p.name.toLowerCase() === suggestedName.toLowerCase(),
+  );
+
+  // Preference, strongest first: what the server worked out from a linked
+  // repository, then a project that simply shares the repository's name, then
+  // creating that project, and only then whatever happens to be first.
+  const [choice, setChoice] = useState(
+    cluster.suggested_project_id ??
+      byName?.id ??
+      (suggestedName ? CREATE : projects[0]?.id ?? ""),
   );
   const n = cluster.commits.length;
   const repos =
@@ -323,11 +355,12 @@ function UnmatchedRow({
         <span className="font-mono t-caption">{repos}</span>
       </span>
       <select
-        value={projectID}
-        onChange={(e) => setProjectID(e.target.value)}
+        value={choice}
+        onChange={(e) => setChoice(e.target.value)}
         aria-label="Project to record this under"
-        className="select max-w-[9rem] py-0.5 t-caption"
+        className="select max-w-[11rem] py-0.5 t-caption"
       >
+        {suggestedName && <option value={CREATE}>+ new “{suggestedName}”</option>}
         {projects.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
@@ -335,11 +368,17 @@ function UnmatchedRow({
         ))}
       </select>
       <button
-        onClick={() => projectID && onRecover(cluster, projectID)}
-        disabled={busy || !projectID}
+        onClick={() =>
+          choice &&
+          onRecover(
+            cluster,
+            choice === CREATE ? { newProject: suggestedName, repo } : { projectID: choice },
+          )
+        }
+        disabled={busy || !choice}
         className="btn-ghost py-0.5 t-body hover:border-punch hover:text-punch"
       >
-        Record
+        {choice === CREATE ? "Create & record" : "Record"}
       </button>
     </div>
   );

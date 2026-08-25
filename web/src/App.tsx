@@ -226,15 +226,26 @@ export function App() {
             clusters={clusters}
             projects={projects}
             busy={busy}
-            onRecover={(cluster, projectID) =>
-              void act(() =>
-                api.recover({
+            onRecover={(cluster, target) =>
+              void act(async () => {
+                let projectID: string;
+                if ("projectID" in target) {
+                  projectID = target.projectID;
+                } else {
+                  // The commits named the project, so create it and link the
+                  // repository they came from — that link is what sharpens the
+                  // suggestion the next time this happens.
+                  const created = await api.createProject({ name: target.newProject });
+                  projectID = created.id;
+                  if (target.repo) await api.linkRepo(projectID, target.repo).catch(() => {});
+                }
+                return api.recover({
                   project_id: projectID,
                   from: cluster.from,
                   to: cluster.to,
                   note: cluster.suggested_note ?? "",
-                }),
-              )
+                });
+              })
             }
           />
 
