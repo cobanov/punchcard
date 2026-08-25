@@ -3,6 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"path"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,44 +25,91 @@ const clusterGap = 30 * time.Minute
 // Nobody's first commit is the first thing they did.
 const clusterLeadIn = 15 * time.Minute
 
-// CommitCluster is a stretch of work with no session covering it.
-type CommitCluster struct {
-	From               time.Time
-	To                 time.Time
-	Repos              []string
+// EvidenceCluster is a stretch of work with no session covering it.
+//
+// The evidence is of two kinds and they are not equal. A commit is something
+// punchcard fetched from GitHub itself; an agent run is something a local hook
+// reported and nothing can check. They cluster together because they answer the
+// same question — when was work happening? — but readers should keep them
+// visibly apart.
+type EvidenceCluster struct {
+	From  time.Time
+	To    time.Time
+	Repos []string
+	// Dirs holds the working directories of runs that had no git remote. It is
+	// a separate field rather than more entries in Repos because "owner/repo"
+	// and "a folder called notes" are different things, and a client that
+	// renders one as the other is telling the user something untrue.
+	Dirs               []string
 	Commits            []db.Commit
+	Runs               []db.AgentRun
 	SuggestedProjectID *uuid.UUID
 	SuggestedNote      string
 }
 
-// UnmatchedClusters groups commits that belong to no session.
+// evidenceItem is one piece of evidence on the timeline.
+//
+// A commit happens at an instant; a run occupies a span. Clustering needs both
+// to be comparable, so a commit is simply a span of zero length.
+type evidenceItem struct {
+	at     time.Time
+	end    time.Time
+	commit *db.Commit
+	run    *db.AgentRun
+}
+
+// UnmatchedClusters groups evidence that belongs to no session.
 //
 // This is the feature that makes a live timer survivable. Forgetting to press
 // start is the one failure mode a timer cannot prevent, and idle detection only
-// guesses at it — but the commits are already there, timestamped, and they say
-// exactly when work happened. So instead of guessing, punchcard shows the user
-// the evidence and offers to write the record.
-func (d *Domain) UnmatchedClusters(ctx context.Context, p *auth.Principal, from, to time.Time) ([]CommitCluster, error) {
-	rows, err := d.store.ListUnmatchedCommits(ctx, db.ListUnmatchedCommitsParams{
+// guesses at it — but the commits and the agent runs are already there,
+// timestamped, and they say exactly when work happened. So instead of guessing,
+// punchcard shows the user the evidence and offers to write the record.
+func (d *Domain) UnmatchedClusters(ctx context.Context, p *auth.Principal, from, to time.Time) ([]EvidenceCluster, error) {
+	commits, err := d.store.ListUnmatchedCommits(ctx, db.ListUnmatchedCommitsParams{
 		UserID: p.UserID, FromTs: from.UTC(), ToTs: to.UTC(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list unmatched commits: %w", err)
 	}
-	if len(rows) == 0 {
+	runs, err := d.store.ListUnmatchedAgentRuns(ctx, db.ListUnmatchedAgentRunsParams{
+		UserID: p.UserID, FromTs: from.UTC(), ToTs: to.UTC(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list unmatched agent runs: %w", err)
+	}
+	if len(commits) == 0 && len(runs) == 0 {
 		return nil, nil
 	}
 
-	clusters := make([]CommitCluster, 0, 4)
-	current := CommitCluster{Commits: []db.Commit{rows[0]}}
-	for _, c := range rows[1:] {
-		last := current.Commits[len(current.Commits)-1]
-		if c.CommittedAt.Sub(last.CommittedAt) > clusterGap {
+	items := make([]evidenceItem, 0, len(commits)+len(runs))
+	for i := range commits {
+		c := &commits[i]
+		items = append(items, evidenceItem{at: c.CommittedAt, end: c.CommittedAt, commit: c})
+	}
+	for i := range runs {
+		r := &runs[i]
+		items = append(items, evidenceItem{at: r.StartedAt, end: r.EndedAt, run: r})
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].at.Before(items[j].at) })
+
+	clusters := make([]EvidenceCluster, 0, 4)
+	current := EvidenceCluster{}
+	// The gap is measured from the furthest point the cluster has reached, not
+	// from the last item's start. A two-hour agent run followed by a commit ten
+	// minutes later is one stretch of work; comparing against the run's start
+	// would call it two.
+	reach := items[0].at
+	for _, it := range items {
+		if !current.empty() && it.at.Sub(reach) > clusterGap {
 			clusters = append(clusters, current)
-			current = CommitCluster{Commits: []db.Commit{c}}
-			continue
+			current = EvidenceCluster{}
+			reach = it.at
 		}
-		current.Commits = append(current.Commits, c)
+		current.add(it)
+		if it.end.After(reach) {
+			reach = it.end
+		}
 	}
 	clusters = append(clusters, current)
 
@@ -69,24 +119,70 @@ func (d *Domain) UnmatchedClusters(ctx context.Context, p *auth.Principal, from,
 	return clusters, nil
 }
 
+func (cl *EvidenceCluster) empty() bool { return len(cl.Commits) == 0 && len(cl.Runs) == 0 }
+
+func (cl *EvidenceCluster) add(it evidenceItem) {
+	if it.commit != nil {
+		cl.Commits = append(cl.Commits, *it.commit)
+		return
+	}
+	cl.Runs = append(cl.Runs, *it.run)
+}
+
 // describeCluster fills in the window, the repositories and the suggestion.
-func (d *Domain) describeCluster(ctx context.Context, p *auth.Principal, cl *CommitCluster) {
-	first := cl.Commits[0]
-	last := cl.Commits[len(cl.Commits)-1]
-	cl.From = first.CommittedAt.Add(-clusterLeadIn)
-	cl.To = last.CommittedAt
+func (d *Domain) describeCluster(ctx context.Context, p *auth.Principal, cl *EvidenceCluster) {
+	// A run knows when work started; a commit only knows when a piece of it
+	// finished, which is why commits get a lead-in and runs do not. Where both
+	// are present the earlier answer wins — evidence, not arithmetic.
+	var from, to time.Time
+	for _, c := range cl.Commits {
+		if start := c.CommittedAt.Add(-clusterLeadIn); from.IsZero() || start.Before(from) {
+			from = start
+		}
+		if to.IsZero() || c.CommittedAt.After(to) {
+			to = c.CommittedAt
+		}
+	}
+	for _, r := range cl.Runs {
+		if from.IsZero() || r.StartedAt.Before(from) {
+			from = r.StartedAt
+		}
+		if to.IsZero() || r.EndedAt.After(to) {
+			to = r.EndedAt
+		}
+	}
+	cl.From, cl.To = from, to
 
 	seenRepo := map[string]bool{}
+	addRepo := func(name string) {
+		if name == "" || seenRepo[name] {
+			return
+		}
+		seenRepo[name] = true
+		cl.Repos = append(cl.Repos, name)
+	}
 	notes := make([]string, 0, len(cl.Commits))
 	for _, c := range cl.Commits {
-		if !seenRepo[c.RepoFullName] {
-			seenRepo[c.RepoFullName] = true
-			cl.Repos = append(cl.Repos, c.RepoFullName)
-		}
+		addRepo(c.RepoFullName)
 		if subject := firstLine(c.Message); subject != "" && len(notes) < 3 {
 			notes = append(notes, subject)
 		}
 	}
+	seenDir := map[string]bool{}
+	for _, r := range cl.Runs {
+		addRepo(r.RepoFullName)
+		// Only when there is no repository: a directory is the weaker answer and
+		// should not compete with one the git remote already gave.
+		if r.RepoFullName == "" && r.Cwd != "" {
+			if base := path.Base(filepath.ToSlash(r.Cwd)); base != "" && base != "." && base != "/" && !seenDir[base] {
+				seenDir[base] = true
+				cl.Dirs = append(cl.Dirs, base)
+			}
+		}
+	}
+	// The note comes from commit subjects and nothing else. Prompts are not
+	// captured — deliberately — so a run has no text to contribute, and
+	// inventing one from the tool name would put words in the user's record.
 	cl.SuggestedNote = truncateRunes(strings.Join(notes, "; "), 500)
 
 	// Suggest a project only when the answer is unambiguous: one repository,
@@ -162,6 +258,11 @@ func (d *Domain) SessionFromCluster(ctx context.Context, p *auth.Principal, in C
 		}); err != nil {
 			return stopped, fmt.Errorf("attach commit: %w", err)
 		}
+	}
+	// StopSession already reconciled; this covers the case where the recovered
+	// window swallowed runs that a neighbouring session used to hold.
+	if err := d.ReconcileAgentRuns(ctx, p.UserID); err != nil {
+		return stopped, err
 	}
 	return stopped, nil
 }

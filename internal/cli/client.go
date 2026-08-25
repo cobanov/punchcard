@@ -249,3 +249,18 @@ func (c *Client) do(method, path string, body any, out any) error {
 	}
 	return nil
 }
+
+// RecordAgentRuns reports a batch of agent working intervals.
+//
+// The reply separates rows the server had never seen from ones it already had,
+// because the queue is flushed at-least-once and "already known" is a success.
+func (c *Client) RecordAgentRuns(runs []QueuedRun) (accepted, duplicates int, err error) {
+	var out struct {
+		Accepted   int `json:"accepted"`
+		Duplicates int `json:"duplicates"`
+	}
+	if err := c.do(http.MethodPost, "/v1/agent-runs", map[string]any{"runs": runs}, &out); err != nil {
+		return 0, 0, err
+	}
+	return out.Accepted, out.Duplicates, nil
+}

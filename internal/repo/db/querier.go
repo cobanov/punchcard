@@ -16,6 +16,14 @@ type Querier interface {
 	AddRecoveryCode(ctx context.Context, arg AddRecoveryCodeParams) error
 	ArchiveProject(ctx context.Context, arg ArchiveProjectParams) (Project, error)
 	AttachCommitToSession(ctx context.Context, arg AttachCommitToSessionParams) (int64, error)
+	// Attach every unattached run whose START falls inside a finished session.
+	//
+	// The range is half-open — [started_at, ended_at) — unlike the commit lookup,
+	// which uses a closed range. A closed range lets a run sitting exactly on a
+	// boundary match both the session that ends there and the one that begins
+	// there, and StartSession deliberately butts sessions up against each other a
+	// microsecond apart. Half-open makes that impossible rather than unlikely.
+	AttachCoveredAgentRuns(ctx context.Context, userID uuid.UUID) (int64, error)
 	ClaimDueDeliveries(ctx context.Context, limit int32) ([]WebhookDelivery, error)
 	// NULL sync_next_at means "due now", and it is how every immediate queueing
 	// writes itself. That is not a shortcut — it removes a clock comparison.
@@ -58,8 +66,15 @@ type Querier interface {
 	DeleteStaleAuthSessions(ctx context.Context) (int64, error)
 	DeleteUserEmailTokens(ctx context.Context, arg DeleteUserEmailTokensParams) error
 	DeleteWebhook(ctx context.Context, arg DeleteWebhookParams) (int64, error)
+	DetachAgentRunsFromSession(ctx context.Context, sessionID uuid.UUID) (int64, error)
 	DetachCommit(ctx context.Context, arg DetachCommitParams) (int64, error)
 	DetachCommitsFromSession(ctx context.Context, sessionID uuid.UUID) (int64, error)
+	// Release runs whose session no longer covers them.
+	//
+	// Editing a session's times is the whole reason this exists: shrink a session
+	// and the runs it used to hold have to become unmatched again, or they stay
+	// filed under a stretch of work that no longer claims them.
+	DetachUncoveredAgentRuns(ctx context.Context, userID uuid.UUID) (int64, error)
 	DisableWebhook(ctx context.Context, arg DisableWebhookParams) error
 	GetAPITokenByHash(ctx context.Context, tokenHash []byte) (GetAPITokenByHashRow, error)
 	GetAuthSessionByHash(ctx context.Context, tokenHash []byte) (GetAuthSessionByHashRow, error)
@@ -79,6 +94,13 @@ type Querier interface {
 	GetWebhook(ctx context.Context, id uuid.UUID) (Webhook, error)
 	GetWorkSession(ctx context.Context, arg GetWorkSessionParams) (WorkSession, error)
 	HardDeleteUser(ctx context.Context, id uuid.UUID) error
+	// Agent runs -----------------------------------------------------------------
+	// Insert, or say nothing if this run is already known.
+	//
+	// DO NOTHING rather than DO UPDATE: the queue is flushed at-least-once and a
+	// resend carries the same facts, so there is nothing to refresh. Returning no
+	// row on conflict is how the caller counts duplicates without a second query.
+	InsertAgentRun(ctx context.Context, arg InsertAgentRunParams) (AgentRun, error)
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	InsertEvent(ctx context.Context, arg InsertEventParams) (Event, error)
 	LinkAppleSub(ctx context.Context, arg LinkAppleSubParams) error
@@ -86,6 +108,7 @@ type Querier interface {
 	LinkGoogleSub(ctx context.Context, arg LinkGoogleSubParams) error
 	LinkProjectRepo(ctx context.Context, arg LinkProjectRepoParams) (ProjectRepo, error)
 	ListActiveWebhooksForUser(ctx context.Context, arg ListActiveWebhooksForUserParams) ([]Webhook, error)
+	ListAgentRunsForSession(ctx context.Context, sessionID uuid.UUID) ([]AgentRun, error)
 	ListAuditForUser(ctx context.Context, arg ListAuditForUserParams) ([]AuditLog, error)
 	ListAuthSessionsByUser(ctx context.Context, userID uuid.UUID) ([]AuthSession, error)
 	ListCommitsForSession(ctx context.Context, sessionID uuid.UUID) ([]Commit, error)
@@ -102,6 +125,9 @@ type Querier interface {
 	ListProjects(ctx context.Context, arg ListProjectsParams) ([]Project, error)
 	ListReposForUser(ctx context.Context, ownerID uuid.UUID) ([]ProjectRepo, error)
 	ListTokensByUser(ctx context.Context, userID uuid.UUID) ([]ApiToken, error)
+	// Runs in the window that belong to no session: the feed behind "an agent was
+	// working here and no timer was running".
+	ListUnmatchedAgentRuns(ctx context.Context, arg ListUnmatchedAgentRunsParams) ([]AgentRun, error)
 	// Commits in the window that belong to no session. This is the feed behind
 	// "unmatched commits": work that happened while no timer was running.
 	ListUnmatchedCommits(ctx context.Context, arg ListUnmatchedCommitsParams) ([]Commit, error)

@@ -96,6 +96,13 @@ func (d *Domain) UpdateSession(ctx context.Context, p *auth.Principal, sessionID
 			return e
 		}
 		updated = ws
+		// Moving a boundary moves what the session holds: runs the new range
+		// covers come in, runs it no longer covers go back to being unmatched.
+		if in.StartedAt != nil || in.SetEnded {
+			if e := reconcileAgentRuns(ctx, q, p.UserID); e != nil {
+				return e
+			}
+		}
 		return events.Write(ctx, q, events.TypeSessionUpdated, &ws.ProjectID, actorOf(p), sessionResource(ws), nil)
 	})
 	if err != nil {
@@ -178,6 +185,13 @@ func (d *Domain) SplitSession(ctx context.Context, p *auth.Principal, sessionID 
 			}
 		}
 
+		// Runs re-file by the clock, like the commits above — except the
+		// statement pair works it out from the ranges rather than being told
+		// which half each one belongs in.
+		if e := reconcileAgentRuns(ctx, q, p.UserID); e != nil {
+			return e
+		}
+
 		if e := events.Write(ctx, q, events.TypeSessionUpdated, &left.ProjectID, actorOf(p), sessionResource(left), nil); e != nil {
 			return e
 		}
@@ -189,8 +203,8 @@ func (d *Domain) SplitSession(ctx context.Context, p *auth.Principal, sessionID 
 	return left, right, nil
 }
 
-// DeleteSession soft-deletes a session. Its commits are not deleted — they
-// simply become unmatched again and reappear as a suggestion.
+// DeleteSession soft-deletes a session. Its commits and agent runs are not
+// deleted — they simply become unmatched again and reappear as a suggestion.
 func (d *Domain) DeleteSession(ctx context.Context, p *auth.Principal, sessionID uuid.UUID) error {
 	if !p.CanWrite() {
 		return ErrInsufficientScope
@@ -211,6 +225,9 @@ func (d *Domain) DeleteSession(ctx context.Context, p *auth.Principal, sessionID
 		// row, so its commits would stay attached to something invisible and
 		// never resurface as unmatched.
 		if _, e := q.DetachCommitsFromSession(ctx, sessionID); e != nil {
+			return e
+		}
+		if _, e := q.DetachAgentRunsFromSession(ctx, sessionID); e != nil {
 			return e
 		}
 		return events.Write(ctx, q, events.TypeSessionDeleted, &ws.ProjectID, actorOf(p),

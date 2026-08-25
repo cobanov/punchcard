@@ -22,14 +22,24 @@ type GitHubStatusDTO struct {
 	Emails      []string   `json:"extra_emails,omitempty"`
 }
 
-// ClusterDTO is a stretch of commits with no session covering it.
+// ClusterDTO is a stretch of work with no session covering it.
+//
+// It carries two kinds of evidence and keeps them apart. Commits are proof
+// punchcard fetched from GitHub; agent runs are what a local hook reported and
+// nothing can verify. A client that renders them identically is overstating
+// what it knows.
 type ClusterDTO struct {
-	From               time.Time   `json:"from" doc:"Suggested start: 15 minutes before the first commit."`
-	To                 time.Time   `json:"to"`
-	Repos              []string    `json:"repos"`
-	Commits            []CommitDTO `json:"commits"`
-	SuggestedProjectID string      `json:"suggested_project_id,omitempty" doc:"Set only when the repository belongs to exactly one project."`
-	SuggestedNote      string      `json:"suggested_note,omitempty"`
+	From time.Time `json:"from" doc:"Suggested start. An agent run knows when work began, so a cluster with one starts there; a cluster of commits alone falls back to 15 minutes before the first."`
+	To   time.Time `json:"to"`
+	// Repos are owner/repo names. Dirs are bare directory names, from runs that
+	// had no git remote — a weaker answer, kept in its own field so a client
+	// cannot mistake one for the other.
+	Repos              []string      `json:"repos"`
+	Dirs               []string      `json:"dirs,omitempty"`
+	Commits            []CommitDTO   `json:"commits"`
+	AgentRuns          []AgentRunDTO `json:"agent_runs,omitempty"`
+	SuggestedProjectID string        `json:"suggested_project_id,omitempty" doc:"Set only when the repository belongs to exactly one project."`
+	SuggestedNote      string        `json:"suggested_note,omitempty"`
 }
 
 func (d Deps) registerGitHubRoutes(api huma.API) {
@@ -146,14 +156,19 @@ func (d Deps) registerGitHubRoutes(api huma.API) {
 		out.Body.Clusters = make([]ClusterDTO, 0, len(clusters))
 		for _, cl := range clusters {
 			dto := ClusterDTO{
-				From: cl.From, To: cl.To, Repos: cl.Repos, SuggestedNote: cl.SuggestedNote,
-				Commits: make([]CommitDTO, 0, len(cl.Commits)),
+				From: cl.From, To: cl.To, Repos: cl.Repos, Dirs: cl.Dirs,
+				SuggestedNote: cl.SuggestedNote,
+				Commits:       make([]CommitDTO, 0, len(cl.Commits)),
+				AgentRuns:     make([]AgentRunDTO, 0, len(cl.Runs)),
 			}
 			if cl.SuggestedProjectID != nil {
 				dto.SuggestedProjectID = cl.SuggestedProjectID.String()
 			}
 			for _, c := range cl.Commits {
 				dto.Commits = append(dto.Commits, commitDTO(c))
+			}
+			for _, r := range cl.Runs {
+				dto.AgentRuns = append(dto.AgentRuns, agentRunDTO(r))
 			}
 			out.Body.Clusters = append(out.Body.Clusters, dto)
 		}
@@ -162,7 +177,7 @@ func (d Deps) registerGitHubRoutes(api huma.API) {
 
 	huma.Register(api, huma.Operation{
 		OperationID: "github-recover-session", Method: http.MethodPost, Path: "/v1/github/unmatched/recover",
-		Summary: "Turn a stretch of unmatched commits into a session", Tags: []string{"github"},
+		Summary: "Turn a stretch of unmatched evidence into a session", Tags: []string{"github"},
 		DefaultStatus: http.StatusCreated, Errors: []int{401, 403, 404, 409, 422},
 	}, func(ctx context.Context, in *struct {
 		Body struct {

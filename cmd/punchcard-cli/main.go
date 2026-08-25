@@ -31,11 +31,17 @@ func run() int {
 	// flag package would force them before the subcommand, which reads badly
 	// for `punchcard start caps "note" --json`.
 	app := &cli.App{Out: os.Stdout, Err: os.Stderr, BaseURL: os.Getenv("PUNCHCARD_URL")}
+	// --tool names which agent a hook line came from. It defaults to Claude
+	// Code because that is what `hook install` wires up; anything else is
+	// integrating through the queue file and can say so.
+	hookTool := "claude-code"
 	var rest []string
 	for _, a := range args {
 		switch {
 		case a == "--json":
 			app.JSON = true
+		case strings.HasPrefix(a, "--tool="):
+			hookTool = strings.TrimPrefix(a, "--tool=")
 		case strings.HasPrefix(a, "--url="):
 			app.BaseURL = strings.TrimPrefix(a, "--url=")
 		default:
@@ -90,6 +96,26 @@ func run() int {
 		cmdErr = app.Today(1)
 	case "week", "w":
 		cmdErr = app.Today(7)
+	case "hook":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, `usage: punchcard hook <install|emit start|emit stop>`)
+			return 2
+		}
+		switch args[1] {
+		case "install":
+			cmdErr = app.HookInstall()
+		case "emit":
+			if len(args) < 3 {
+				fmt.Fprintln(os.Stderr, `usage: punchcard hook emit <start|stop> [--tool name]`)
+				return 2
+			}
+			cmdErr = app.HookEmit(args[2], hookTool, os.Stdin)
+		default:
+			fmt.Fprintf(os.Stderr, "unknown hook command %q\n", args[1])
+			return 2
+		}
+	case "sync":
+		cmdErr = app.Sync()
 	case "version", "--version", "-v":
 		fmt.Println("punchcard", version)
 		return 0
@@ -136,6 +162,8 @@ Commands:
   status                     What is running, and for how long
   today                      Today's records with their commits
   week                       The last seven days
+  sync                       Send recorded agent turns to the server
+  hook install               Record Claude Code turns as evidence
   projects                   List projects
   new <name> [client] [rate] [currency]
                              Create a project

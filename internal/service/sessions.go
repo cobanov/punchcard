@@ -146,6 +146,11 @@ func (d *Domain) StopSession(ctx context.Context, p *auth.Principal, sessionID u
 			return e
 		}
 		stopped = ws
+		// A session only files runs once it has an end: until now this stretch
+		// had no closed range for a run to fall inside.
+		if e := reconcileAgentRuns(ctx, q, p.UserID); e != nil {
+			return e
+		}
 		return events.Write(ctx, q, events.TypeSessionStopped, &ws.ProjectID, actorOf(p), sessionResource(ws), nil)
 	})
 	if err != nil {

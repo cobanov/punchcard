@@ -1,5 +1,5 @@
-import { useState, type CSSProperties } from "react";
-import type { Cluster, Commit, Project, Session } from "../lib/api";
+import { useEffect, useState, type CSSProperties } from "react";
+import { api, type AgentRun, type Cluster, type Commit, type Project, type Session } from "../lib/api";
 import { firstLine, hhmm, total } from "../lib/format";
 
 /**
@@ -107,6 +107,7 @@ export function SessionList({ sessions, commits, projects, onSave, onDelete, bus
                     ))}
                   </ul>
                 )}
+                <AgentRunList sessionID={session.id} />
               </div>
             )}
           </li>
@@ -319,7 +320,12 @@ function UnmatchedRow({
   busy: boolean;
 }) {
   const repo = cluster.repos[0] ?? "";
-  const suggestedName = repo ? repoBase(repo) : "";
+  // A repository names the project best. Failing that, a run's working
+  // directory is the next honest guess — it is what the person called the
+  // folder they were working in.
+  const suggestedName = repo ? repoBase(repo) : (cluster.dirs?.[0] ?? "");
+  const runs = cluster.agent_runs ?? [];
+  const agentSeconds = runs.reduce((sum, r) => sum + r.seconds, 0);
   // A project already named after the repository is almost certainly the one
   // meant, even when nothing was ever linked.
   const byName = projects.find(
@@ -348,11 +354,17 @@ function UnmatchedRow({
         title="Commits with no session around them"
       />
       <span className="min-w-0 flex-1 truncate t-body text-dim">
-        <span className="text-text">{n} commit{n === 1 ? "" : "s"}</span>
+        <span className="text-text">
+          {n > 0 && `${n} commit${n === 1 ? "" : "s"}`}
+          {n > 0 && runs.length > 0 && ", "}
+          {/* A run knows how long it lasted, so say so — that is the number
+              being offered as a record, and it is more use than a count. */}
+          {runs.length > 0 && `${total(agentSeconds)} of agent work`}
+        </span>
         {" · "}
         {clusterDayLabel(cluster.from)}
         {hhmm(cluster.from)}–{hhmm(cluster.to)} · no timer was running ·{" "}
-        <span className="font-mono t-caption">{repos}</span>
+        <span className="font-mono t-caption">{repos || cluster.dirs?.join(", ") || "—"}</span>
       </span>
       <select
         value={choice}
@@ -380,6 +392,58 @@ function UnmatchedRow({
       >
         {choice === CREATE ? "Create & record" : "Record"}
       </button>
+    </div>
+  );
+}
+
+/**
+ * The agent runs filed against a session.
+ *
+ * Fetched when the row opens rather than with the day: this is the only place
+ * they appear, and loading them for every session on every day view would
+ * double the requests to show something nobody had asked to see yet.
+ *
+ * They render below the commits and quieter than them, on purpose. A commit is
+ * something punchcard fetched from GitHub and can prove; a run is what a local
+ * hook said happened. Showing them at the same weight would claim a certainty
+ * the second kind does not have — hence the word "reported", said once.
+ */
+function AgentRunList({ sessionID }: { sessionID: string }) {
+  const [runs, setRuns] = useState<AgentRun[] | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void api
+      .agentRuns(sessionID)
+      .then((r) => live && setRuns(r))
+      .catch(() => live && setRuns([]));
+    return () => {
+      live = false;
+    };
+  }, [sessionID]);
+
+  if (!runs?.length) return null;
+
+  return (
+    <div className="pt-1.5">
+      <p className="eyebrow mb-1">Reported by agents</p>
+      <ul className="space-y-1">
+        {runs.map((run, i) => (
+          <li key={`${run.tool}-${run.started_at}-${i}`} className="flex items-baseline gap-2.5 t-caption text-faint">
+            <span className="shrink-0 font-mono text-dim">{run.tool}</span>
+            <span className="shrink-0 tnum font-mono">
+              {hhmm(run.started_at)}–{hhmm(run.ended_at)}
+            </span>
+            <span className="shrink-0 tnum">{total(run.seconds)}</span>
+            {run.model && <span className="min-w-0 truncate font-mono">{run.model}</span>}
+            {run.tool_calls != null && (
+              <span className="ml-auto shrink-0 tnum">
+                {run.tool_calls} tool{run.tool_calls === 1 ? "" : "s"}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

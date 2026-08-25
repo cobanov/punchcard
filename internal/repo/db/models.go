@@ -10,6 +10,20 @@ import (
 	"github.com/google/uuid"
 )
 
+type AgentRun struct {
+	ID           uuid.UUID `json:"id"`
+	UserID       uuid.UUID `json:"user_id"`
+	Tool         string    `json:"tool"`
+	ExternalID   string    `json:"external_id"`
+	StartedAt    time.Time `json:"started_at"`
+	EndedAt      time.Time `json:"ended_at"`
+	Model        string    `json:"model"`
+	Cwd          string    `json:"cwd"`
+	RepoFullName string    `json:"repo_full_name"`
+	ToolCalls    *int32    `json:"tool_calls"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
 type ApiToken struct {
 	ID               uuid.UUID   `json:"id"`
 	UserID           uuid.UUID   `json:"user_id"`
@@ -130,6 +144,12 @@ type ProjectRepo struct {
 	Branches   []byte     `json:"branches"`
 	BranchesAt *time.Time `json:"branches_at"`
 	CreatedAt  time.Time  `json:"created_at"`
+}
+
+type SessionAgentRun struct {
+	SessionID  uuid.UUID `json:"session_id"`
+	AgentRunID uuid.UUID `json:"agent_run_id"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type SessionCommit struct {

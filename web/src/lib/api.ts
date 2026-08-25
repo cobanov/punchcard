@@ -56,11 +56,33 @@ export interface Commit {
   url?: string;
 }
 
+/**
+ * One agent's working interval, as reported by a local hook.
+ *
+ * Reported is the word that matters. A commit is something punchcard fetched
+ * from GitHub itself and can prove; this is a client's account of what it did,
+ * which nothing can check. Screens keep the two visibly apart.
+ */
+export interface AgentRun {
+  tool: string;
+  started_at: string;
+  ended_at: string;
+  seconds: number;
+  model?: string;
+  cwd?: string;
+  repo?: string;
+  tool_calls?: number;
+}
+
 export interface Cluster {
   from: string;
   to: string;
   repos: string[];
+  /** Bare directory names from runs with no git remote — a weaker answer than
+   *  a repository, which is why it is a separate field. */
+  dirs?: string[];
   commits: Commit[];
+  agent_runs?: AgentRun[];
   suggested_project_id?: string;
   suggested_note?: string;
 }
@@ -202,6 +224,11 @@ export const api = {
 
   commits: (sessionID: string) =>
     call<{ commits: Commit[] }>(`/v1/sessions/${sessionID}/commits`).then((r) => r.commits),
+
+  agentRuns: (sessionID: string) =>
+    call<{ agent_runs: AgentRun[] }>(`/v1/sessions/${sessionID}/agent-runs`).then(
+      (r) => r.agent_runs ?? [],
+    ),
 
   unmatched: (from: Date, to: Date) =>
     call<{ clusters: Cluster[] }>(`/v1/github/unmatched?${range(from, to)}`)

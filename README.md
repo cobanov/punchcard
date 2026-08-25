@@ -73,6 +73,47 @@ wins, and an ambiguous prefix tells you what it matched.
 `--json` on any command gives machine-readable output; `PUNCHCARD_URL` or
 `--url=` points it at a self-hosted instance.
 
+## Agent runs
+
+An AI coding agent working in a repository is evidence of work in the same way a
+commit is, so punchcard records it the same way: a local hook reports the
+interval, and the interval lands under whichever session covers it. Runs never
+start or stop a timer and never become billable time — they are attached to the
+record you declared, and runs with no session around them show up as unmatched,
+next to the commits.
+
+For Claude Code:
+
+```bash
+punchcard hook install     # merges two hooks into ~/.claude/settings.json
+punchcard sync             # send what has been recorded
+```
+
+`hook install` merges — it never rewrites hooks it did not write, and running it
+twice does not stack a second copy.
+
+**The integration contract is a file, not an API.** Any tool that can run a
+command when it finishes a turn can report runs by appending one JSON object per
+line to `$XDG_STATE_HOME/punchcard/queue.jsonl` (default
+`~/.local/state/punchcard/queue.jsonl`):
+
+```json
+{"tool":"codex","external_id":"<stable id, resent safely>","started_at":"2026-08-25T14:02:11+03:00","ended_at":"2026-08-25T14:44:03+03:00","model":"o4","cwd":"/path/to/work","repo":"owner/repo","tool_calls":14}
+```
+
+Only `tool`, `external_id`, `started_at` and `ended_at` are required. `punchcard
+sync` sends the queue and clears what the server took; `external_id` is the
+idempotency key, so flushing twice costs nothing. The hook itself never touches
+the network — it appends a line and returns, which is why it still works on a
+plane and cannot make your editor wait on a server.
+
+To send periodically, run `punchcard sync` from launchd, cron or a systemd
+timer. Nothing is lost in the meantime: the queue simply grows.
+
+> A run is **reported**, not verified. punchcard fetches commits from GitHub and
+> can prove them; a run is a local client's account of itself, and the interface
+> keeps that distinction visible rather than flattening the two into one number.
+
 ## Local development
 
 ```bash
