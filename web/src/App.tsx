@@ -11,6 +11,7 @@ import {
   type Session,
 } from "./lib/api";
 import { addDays, dayName, daysAgo, isToday, startOfToday, toDateInput, total } from "./lib/format";
+import { DayTimeline } from "./components/DayTimeline";
 import { SessionList, UnmatchedList } from "./components/SessionList";
 import { Projects } from "./components/Projects";
 import { TimerBar } from "./components/TimerBar";
@@ -212,6 +213,10 @@ export function App() {
 
           <section className="panel mt-3 overflow-hidden" aria-label="Sessions">
             <DayNav day={day} onChange={setDay} />
+            {/* The table says what and for how long; the strip says when, and
+                how the day broke up. Those are different questions and a list
+                only answers the first. */}
+            <DayTimeline sessions={sessions} projects={projects} />
             <SessionList
               sessions={sessions}
               commits={commits}

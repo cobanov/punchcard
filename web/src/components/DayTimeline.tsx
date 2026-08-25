@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { Project, Session } from "../lib/api";
 import { assignColors } from "../lib/palette";
 import { total } from "../lib/format";
@@ -28,12 +29,19 @@ function minuteOfDay(iso: string): number {
 export function DayTimeline({
   sessions,
   projects,
-  now,
 }: {
   sessions: Session[];
   projects: Project[];
-  now: Date;
 }) {
+  // The running block grows about a fifteenth of a percent per minute across a
+  // strip this wide, so it ticks once a minute rather than once a second. The
+  // clock in the timer bar is the thing that has to move; this is a shape.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const colors = assignColors(projects);
   const name = (id: string) => projects.find((p) => p.id === id)?.name ?? "—";
 
