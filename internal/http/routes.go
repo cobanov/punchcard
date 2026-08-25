@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/cobanov/punchcard/internal/config"
+	"github.com/cobanov/punchcard/internal/http/app"
 	"github.com/cobanov/punchcard/internal/http/landing"
 	"github.com/cobanov/punchcard/internal/http/legal"
 	"github.com/cobanov/punchcard/internal/oauth"
@@ -126,6 +127,10 @@ func BuildRouter(d Deps) (*chi.Mux, huma.API) {
 	// the bare hostname answered chi's default "404 page not found" — a healthy
 	// service that read as broken to whoever opened it.
 	r.Get("/", landing.Handler())
+
+	// The web client. Small, static, and meant to be replaced — see
+	// internal/http/app.
+	r.Get("/app", app.Handler())
 
 	// Legal documents. Public, unauthenticated, and served as their own HTML
 	// rather than as SPA routes: App Store Connect requires a reachable privacy

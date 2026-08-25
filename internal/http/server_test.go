@@ -116,3 +116,41 @@ func TestUnknownPathReturnsProblemJSON(t *testing.T) {
 		t.Fatalf("problem body has no machine-readable code: %s", body)
 	}
 }
+
+// The web client is served, self-contained, and points at the API it uses.
+func TestWebClientIsServed(t *testing.T) {
+	pool := testutil.Postgres(t)
+	migrator, err := repo.NewMigrator(pool)
+	if err != nil {
+		t.Fatalf("new migrator: %v", err)
+	}
+	t.Cleanup(func() { _ = migrator.Close() })
+
+	router, _ := BuildRouter(Deps{
+		Config: testConfig(), Logger: observability.NewLogger("error"),
+		Metrics: observability.NewMetrics(), Pool: pool, Migrator: migrator,
+	})
+	srv := httptest.NewServer(router)
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Get(srv.URL + "/app") //nolint:gosec // test-controlled localhost URL
+	if err != nil {
+		t.Fatalf("GET /app: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /app = %d, want 200", resp.StatusCode)
+	}
+	// Self-contained: no build step means no external script or stylesheet to
+	// fetch, and nothing to go stale separately from the binary.
+	if strings.Contains(string(body), "<script src=") || strings.Contains(string(body), "<link rel=\"stylesheet\"") {
+		t.Fatal("the web client must not load external assets")
+	}
+	for _, needed := range []string{"/v1/sessions", "/v1/projects", "X-CSRF-Token"} {
+		if !strings.Contains(string(body), needed) {
+			t.Fatalf("the web client does not reference %s", needed)
+		}
+	}
+}

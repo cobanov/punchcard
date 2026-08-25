@@ -15,10 +15,13 @@ Free to use — run the hosted instance or self-host the identical single binary
 
 ## Status
 
-**v1 is the backend.** A working, documented API: accounts, projects, timers,
-reports and GitHub commit matching, with interactive documentation at `/docs`
-and a one-page explanation at `/`. There is no web interface yet; it gets its
-own design and its own release.
+**v1 is the backend, plus three thin clients.** A working, documented API —
+accounts, projects, timers, reports and GitHub commit matching — with a CLI, a
+macOS menu bar app, and a small web client at `/app`.
+
+The web client is deliberately minimal and meant to be replaced: one static file
+with no build step, so whatever comes next can delete it without unpicking
+anything.
 
 ## Quick start (self-host)
 
@@ -94,6 +97,8 @@ internal/repo        every database access; nothing else imports pgx
 internal/service     the domain: projects, sessions, reports, GitHub
 internal/github      the GitHub REST client and the branch-walking scanner
 internal/http        transport: huma operations, middleware, SSE
+internal/http/app    the web client — one static file, no build step
+apps/menubar         the macOS menu bar app (Swift)
 ```
 
 Two rules the schema enforces rather than the code:
