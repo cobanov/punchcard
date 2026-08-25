@@ -59,7 +59,7 @@ export function UserMenu({
           // pixels past the container edge so the account name lines up with
           // the cards below, and the menu has to give those six back or it
           // hangs off the layout.
-          className="panel absolute right-1.5 z-20 mt-1 w-56 overflow-hidden py-1"
+          className="menu-pop panel absolute right-1.5 z-20 mt-1 w-56 overflow-hidden py-1"
         >
           <div className="border-b border-line px-3 pb-2 pt-1">
             <p className="truncate font-medium">{label}</p>

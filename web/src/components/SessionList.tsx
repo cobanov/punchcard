@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { api, type AgentRun, type Cluster, type Commit, type Project, type Session } from "../lib/api";
 import { firstLine, hhmm, total } from "../lib/format";
 
@@ -41,16 +41,17 @@ export function SessionList({ sessions, commits, projects, onSave, onDelete, bus
   }
 
   return (
-    // One template for the header and every row below it. The commit cell is a
-    // fixed track rather than a badge that sizes itself, so the note beside it
-    // truncates at the same pixel on every row.
-    <div style={{ "--tbl-cols": "5.5rem 9rem minmax(0, 1fr) 3.5rem 4.5rem" } as CSSProperties}>
-      <div className="tbl-head">
-        <span>Time</span>
-        <span>Project</span>
-        <span>Note</span>
-        <span className="text-center">Commits</span>
-        <span className="text-right">Duration</span>
+    // One template for the header and every row below it, declared in CSS so a
+    // media query can rearrange it. The commit cell is a fixed track rather
+    // than a badge that sizes itself, so the note beside it truncates at the
+    // same pixel on every row.
+    <div className="tbl-sessions">
+      <div className="tbl-head hidden mid:grid">
+        <span className="c-time">Time</span>
+        <span className="c-project">Project</span>
+        <span className="c-note">Note</span>
+        <span className="c-commits text-center">Commits</span>
+        <span className="c-dur text-right">Duration</span>
       </div>
       <ul className="divide-y divide-line">
       {finished.map((session) => {
@@ -63,21 +64,21 @@ export function SessionList({ sessions, commits, projects, onSave, onDelete, bus
               aria-expanded={expanded}
               className="tbl-row w-full transition-colors duration-100 hover:bg-raise/60"
             >
-              <span className="tnum t-caption font-mono text-faint">
+              <span className="c-time tnum t-caption font-mono text-faint">
                 {hhmm(session.started_at)}–{session.ended_at ? hhmm(session.ended_at) : "…"}
               </span>
-              <span className="truncate font-medium">
+              <span className="c-project truncate font-medium">
                 {projectName(session.project_id)}
               </span>
-              <span className="truncate text-dim">{session.note || "—"}</span>
+              <span className="c-note truncate text-dim">{session.note || "—"}</span>
               <CommitBadge count={own.length} syncState={session.commit_sync_state} />
-              <span className="tbl-num t-caption text-dim">
+              <span className="c-dur tbl-num t-caption text-dim">
                 {total(session.seconds)}
               </span>
             </button>
 
             {expanded && (
-              <div className="space-y-2 border-t border-line/60 bg-ink/40 px-3 py-2.5">
+              <div className="row-reveal space-y-2 border-t border-line/60 bg-ink/40 px-3 py-2.5">
                 <EditRow
                   session={session}
                   projects={projects}
@@ -240,7 +241,7 @@ function onDay(iso: string, hhmmValue: string): string {
  */
 function CommitBadge({ count, syncState }: { count: number; syncState: string }) {
   return (
-    <span className="flex justify-center">
+    <span className="c-commits flex justify-center mid:justify-center">
       {count > 0 ? (
         <span
           title={`${count} commit${count === 1 ? "" : "s"} in this session`}

@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { api, type Project, type Repo } from "../lib/api";
 import { money } from "../lib/format";
 import { assignColors, COLOR_NAMES, PALETTE, projectColor } from "../lib/palette";
@@ -43,15 +43,12 @@ export function Projects({ projects, onChange }: { projects: Project[]; onChange
         </p>
       )}
 
-      <div
-        className="panel"
-        style={{ "--tbl-cols": "minmax(0, 1fr) 9rem 7rem 4rem" } as CSSProperties}
-      >
-        <div className="tbl-head">
-          <span>Project</span>
-          <span>Client</span>
-          <span className="text-right">Rate</span>
-          <span />
+      <div className="panel tbl-projects">
+        <div className="tbl-head hidden mid:grid">
+          <span className="c-project">Project</span>
+          <span className="c-client">Client</span>
+          <span className="c-rate text-right">Rate</span>
+          <span className="c-act" />
         </div>
         <ul className="divide-y divide-line">
           {projects.map((project) => (
@@ -64,7 +61,7 @@ export function Projects({ projects, onChange }: { projects: Project[]; onChange
                 <button
                   onClick={() => setOpen(open === project.id ? null : project.id)}
                   aria-expanded={open === project.id}
-                  className="flex min-w-0 items-center gap-2 text-left"
+                  className="c-project flex min-w-0 items-center gap-2 text-left"
                 >
                   <span
                     className="size-2 shrink-0 rounded-full"
@@ -75,8 +72,8 @@ export function Projects({ projects, onChange }: { projects: Project[]; onChange
                     {project.name}
                   </span>
                 </button>
-                <span className="truncate text-dim">{project.client || "—"}</span>
-                <span className="tbl-num t-body text-dim">
+                <span className="c-client truncate text-dim">{project.client || "—"}</span>
+                <span className="c-rate tbl-num t-body text-dim">
                   {project.hourly_rate_cents != null
                     ? `${money(project.hourly_rate_cents, project.currency)}/h`
                     : "—"}
@@ -84,7 +81,7 @@ export function Projects({ projects, onChange }: { projects: Project[]; onChange
                 <button
                   onClick={() => setOpen(open === project.id ? null : project.id)}
                   aria-label={`Edit ${project.name}`}
-                  className="btn-bare t-caption text-right"
+                  className="c-act btn-bare t-caption text-right"
                 >
                   {open === project.id ? "close" : "edit"}
                 </button>
@@ -313,7 +310,7 @@ function Swatches({
           className={
             value === c
               ? "size-6 rounded-full ring-2 ring-text ring-offset-2 ring-offset-ink"
-              : "size-6 rounded-full transition-transform hover:scale-110"
+              : "swatch size-6 rounded-full"
           }
           style={{ background: PALETTE[c] }}
         />

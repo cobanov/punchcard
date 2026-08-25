@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, type ProjectTotal } from "../lib/api";
 import { money, total } from "../lib/format";
 import { assignColors } from "../lib/palette";
@@ -334,7 +334,7 @@ function DayChart({ days, timezone }: { days: { date: string; seconds: number }[
             {/* Gridlines, behind the bars, quiet enough to read past. */}
             <span className="absolute inset-x-0 top-0 h-px bg-line/60" aria-hidden />
             <span className="absolute inset-x-0 top-1/2 h-px bg-line/60" aria-hidden />
-            {days.map((d) => {
+            {days.map((d, i) => {
               const pct = (d.seconds / ceiling) * 100;
               return (
                 <div
@@ -347,10 +347,16 @@ function DayChart({ days, timezone }: { days: { date: string; seconds: number }[
                   <div
                     className={
                       d.seconds > 0
-                        ? "w-full rounded-t-sm bg-punch/80 transition-colors group-hover:bg-punch"
-                        : "w-full rounded-t-sm bg-raise"
+                        ? "bar-grow w-full rounded-t-sm bg-punch/80 transition-colors group-hover:bg-punch"
+                        : "bar-grow w-full rounded-t-sm bg-raise"
                     }
-                    style={{ height: d.seconds > 0 ? `${Math.max(pct, 2)}%` : "2px" }}
+                    // The columns arrive left to right, which is the direction
+                    // the axis is read in. Capped, because a thirty-day range
+                    // should not spend a second dealing itself out.
+                    style={{
+                      height: d.seconds > 0 ? `${Math.max(pct, 2)}%` : "2px",
+                      animationDelay: `${Math.min(i * 24, 240)}ms`,
+                    }}
                   />
                 </div>
               );
@@ -388,18 +394,15 @@ function Breakdown({
 }) {
   const colors = assignColors(projects.map((p) => ({ id: p.project_id, color: p.color })));
   return (
-    <section
-      className="panel overflow-hidden"
-      // Same template for the header and every row, so the share, the time and
-      // the amount each land on one vertical edge instead of near it.
-      style={{ "--tbl-cols": "minmax(0, 1fr) 7rem 3rem 4.5rem 6rem" } as CSSProperties}
-    >
-      <div className="tbl-head">
-        <span>Project</span>
-        <span>Client</span>
-        <span className="text-right">Share</span>
-        <span className="text-right">Time</span>
-        <span className="text-right">Amount</span>
+    // Same template for the header and every row, so the share, the time and
+    // the amount each land on one vertical edge instead of near it.
+    <section className="panel tbl-breakdown overflow-hidden">
+      <div className="tbl-head hidden mid:grid">
+        <span className="c-project">Project</span>
+        <span className="c-client">Client</span>
+        <span className="c-share text-right">Share</span>
+        <span className="c-time text-right">Time</span>
+        <span className="c-amount text-right">Amount</span>
       </div>
       <ul className="divide-y divide-line">
         {projects.map((p) => {
@@ -407,7 +410,7 @@ function Breakdown({
           return (
             <li key={p.project_id} className="pb-2 pt-1">
               <div className="tbl-row">
-                <span className="flex min-w-0 items-center gap-2">
+                <span className="c-project flex min-w-0 items-center gap-2">
                   <span
                     className="size-2 shrink-0 rounded-full"
                     style={{ background: colors.get(p.project_id) }}
@@ -415,10 +418,10 @@ function Breakdown({
                   />
                   <span className="truncate font-medium">{p.name}</span>
                 </span>
-                <span className="truncate text-dim">{p.client || "—"}</span>
-                <span className="tbl-num t-caption text-faint">{share}%</span>
-                <span className="tbl-num text-dim">{total(p.seconds)}</span>
-                <span className="tbl-num">
+                <span className="c-client truncate text-dim">{p.client || "—"}</span>
+                <span className="c-share tbl-num t-caption text-faint">{share}%</span>
+                <span className="c-time tbl-num text-dim">{total(p.seconds)}</span>
+                <span className="c-amount tbl-num">
                   {p.amount_cents == null ? (
                     <span className="text-faint">—</span>
                   ) : (

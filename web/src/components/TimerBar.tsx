@@ -59,7 +59,7 @@ export function TimerBar({ current, projects, projectName, onStart, onStop, busy
 
   if (current?.running) {
     return (
-      <section aria-label="Running timer" className="panel flex items-center gap-3 px-4 py-3">
+      <section aria-label="Running timer" className="timer-in panel flex items-center gap-3 px-4 py-3">
         <span className="breathe h-2 w-2 shrink-0 rounded-full bg-punch" aria-hidden />
         <span className="t-clock shrink-0 text-punch">
           {clock(elapsed(current))}
@@ -106,7 +106,7 @@ export function TimerBar({ current, projects, projectName, onStart, onStop, busy
           value={projectID}
           onChange={(e) => setProjectID(e.target.value)}
           aria-label="Project"
-          className="select max-w-[11rem] py-1.5"
+          className="select w-28 shrink-0 py-1.5 mid:w-auto mid:max-w-[11rem]"
         >
           {projects.map((p) => (
             <option key={p.id} value={p.id}>

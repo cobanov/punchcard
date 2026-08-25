@@ -59,6 +59,28 @@
   --space-8: 2rem;
   --space-12: 3rem;
 
+  /* Motion.
+   *
+   * These override Tailwind's built-in curves rather than sitting beside them,
+   * so `ease-out` in a class name and `var(--ease-out)` in a stylesheet are the
+   * same curve. The built-ins are too weak to read as deliberate: the point of
+   * a strong ease-out is that almost all the distance is covered in the first
+   * third, which is what makes 180ms feel faster than 180ms of anything else.
+   *
+   * ease-in is deliberately absent. It starts slow, which delays the exact
+   * moment the user is watching, and there is no UI situation here that wants
+   * it. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* Durations named for what they are attached to. UI motion stays under
+   * 300ms; past that a control stops feeling like it is answering you. */
+  --duration-press: 140ms;   /* button press feedback */
+  --duration-tip: 140ms;     /* tooltips */
+  --duration-reveal: 160ms;  /* content appearing in place */
+  --duration-pop: 180ms;     /* menus and popovers */
+  --duration-rise: 220ms;    /* chart bars, one-off entrances */
+
   /* Breakpoints named for viewport behaviour, not hardware — "phone" ages
    * badly, "narrow" does not. */
   --breakpoint-narrow: 30rem;
@@ -179,9 +201,17 @@
    * .tbl-head and .tbl-row read it. A column cannot drift from its header,
    * because they are the same track.
    */
+  /* Narrow screens do not get narrower columns — they get fewer lines.
+   *
+   * Squeezing five fixed columns into 375px leaves the note, the only cell
+   * holding a sentence, with nothing. So below `mid` the same cells rearrange
+   * onto two rows through grid-template-areas: the facts you scan by stay on
+   * the first line, the sentence gets the full width of the second. The header
+   * row is hidden there, because a two-line row has no columns to label. */
   .tbl-head {
     display: grid;
     grid-template-columns: var(--tbl-cols);
+    grid-template-areas: var(--tbl-areas, none);
     align-items: center;
     gap: var(--space-3);
     min-height: 2.25rem;
@@ -194,10 +224,67 @@
   .tbl-row {
     display: grid;
     grid-template-columns: var(--tbl-cols);
+    grid-template-areas: var(--tbl-areas, none);
     align-items: center;
     gap: var(--space-3);
     min-height: 2.5rem;
     @apply px-3 text-left;
+  }
+
+  /* Cells name the area they occupy, so a template can move them without any
+   * component knowing which layout is in force. */
+  .c-time { grid-area: time; }
+  .c-project { grid-area: project; }
+  .c-note { grid-area: note; }
+  .c-commits { grid-area: commits; }
+  .c-dur { grid-area: dur; }
+  .c-client { grid-area: client; }
+  .c-rate { grid-area: rate; }
+  .c-act { grid-area: act; }
+  .c-share { grid-area: share; }
+  .c-amount { grid-area: amount; }
+
+  /* The day's sessions. */
+  .tbl-sessions {
+    --tbl-cols: 4.75rem minmax(0, 1fr) 3.75rem;
+    --tbl-areas: "time project dur" "note note commits";
+    row-gap: var(--space-1);
+    padding-block: var(--space-2);
+  }
+  /* Projects. Client is the one field short enough to fold under the name. */
+  .tbl-projects {
+    --tbl-cols: minmax(0, 1fr) 5.5rem 3rem;
+    --tbl-areas: "project rate act" "client client act";
+    row-gap: var(--space-1);
+    padding-block: var(--space-2);
+  }
+  /* The analytics breakdown. */
+  .tbl-breakdown {
+    --tbl-cols: minmax(0, 1fr) 3rem 4.5rem;
+    --tbl-areas: "project share time" "client client amount";
+    row-gap: var(--space-1);
+    padding-block: var(--space-2);
+  }
+
+  @media (width >= 48rem) {
+    .tbl-sessions {
+      --tbl-cols: 5.5rem 9rem minmax(0, 1fr) 3.5rem 4.5rem;
+      --tbl-areas: "time project note commits dur";
+      row-gap: 0;
+      padding-block: 0;
+    }
+    .tbl-projects {
+      --tbl-cols: minmax(0, 1fr) 9rem 7rem 4rem;
+      --tbl-areas: "project client rate act";
+      row-gap: 0;
+      padding-block: 0;
+    }
+    .tbl-breakdown {
+      --tbl-cols: minmax(0, 1fr) 7rem 3rem 4.5rem 6rem;
+      --tbl-areas: "project client share time amount";
+      row-gap: 0;
+      padding-block: 0;
+    }
   }
   /* Numeric cells line up on their last digit, always. */
   .tbl-num {
@@ -227,13 +314,111 @@
   }
 }
 
+/* Reduced motion means fewer and gentler, not none.
+ *
+ * This used to flatten every duration to 0.01ms, which is the easy version and
+ * the wrong one: it also froze the things that carry meaning rather than
+ * movement. A skeleton that stops shimmering stops saying "loading", and the
+ * running dot's pulse is the one place the app says "this is happening now"
+ * without words. Neither of them moves — they only change opacity — so neither
+ * is what a person asking for less motion is asking to be rid of.
+ *
+ * What goes is travel: transforms stop being transitionable, so nothing slides
+ * or scales, while colour and opacity still explain what changed. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
+    transition-property: opacity, color, background-color, border-color, box-shadow !important;
   }
+
+  /* Entrances still happen — the element would otherwise appear with no
+   * acknowledgement at all — but they arrive in place instead of travelling. */
+  .menu-pop,
+  .row-reveal,
+  .timer-in,
+  .bar-rise,
+  .tip {
+    animation: reduced-fade var(--duration-reveal) var(--ease-out) both !important;
+  }
+
+  /* The ambient loops slow down rather than stop. */
+  .skeleton { animation-duration: 2.4s !important; }
+  .breathe { animation-duration: 4s !important; }
+}
+
+@keyframes reduced-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Motion ---------------------------------------------------------------------
+ *
+ * Every entrance here is a CSS animation on a mounting element rather than a
+ * transition, because these elements are conditionally rendered: they have no
+ * previous state to transition from. Nothing here is triggered fast enough for
+ * the keyframe-restart problem that rules out keyframes on toasts and toggles.
+ *
+ * Nothing starts from scale(0). Things in the world do not appear from nothing,
+ * and an element that does reads as a glitch rather than as an arrival. */
+
+/* The account menu, arriving from the control that opened it. Anchored at the
+ * top right because that is where the avatar is: a panel that grows from its
+ * own trigger explains where it came from without a word. */
+@keyframes menu-pop {
+  from { opacity: 0; transform: scale(0.96) translateY(-2px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.menu-pop {
+  transform-origin: top right;
+  animation: menu-pop var(--duration-pop) var(--ease-out) both;
+}
+
+/* Content appearing in place — an expanded row, the timer bar taking over from
+ * the start field. Three pixels of travel, which is enough to read as "this
+ * arrived" and not enough to read as an animation. */
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.row-reveal { animation: reveal var(--duration-reveal) var(--ease-out) both; }
+.timer-in   { animation: reveal var(--duration-reveal) var(--ease-out) both; }
+
+/* Bars and blocks. The stagger is set per element as an animation-delay, never
+ * as a custom property on the parent — a variable on a parent recalculates
+ * styles for every child it has. */
+@keyframes bar-rise {
+  from { opacity: 0; transform: scaleY(0.6); }
+  to   { opacity: 1; transform: scaleY(1); }
+}
+.bar-rise { animation: bar-rise var(--duration-rise) var(--ease-out) both; }
+/* Chart columns grow from the axis they are measured against, not from their
+ * own middle. */
+.bar-grow {
+  transform-origin: bottom;
+  animation: bar-rise var(--duration-rise) var(--ease-out) both;
+}
+
+/* Tooltips. Scaled from the bottom because they sit above what they describe,
+ * so they grow out of it rather than landing on top of it. */
+@keyframes tip-in {
+  from { opacity: 0; transform: translateX(-50%) scale(0.96) translateY(2px); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
+}
+.tip {
+  transform-origin: bottom center;
+  animation: tip-in var(--duration-tip) var(--ease-out) both;
+}
+/* Already warm: the pointer is moving between neighbours and re-playing the
+ * entrance on each one would turn scrubbing into a flicker. */
+.tip-instant { animation: none; }
+
+/* Hover motion only where hovering is a real thing. A tap on a touch screen
+ * fires :hover and leaves it stuck on, so an element that grows on hover stays
+ * grown until something else is touched. */
+.swatch { transition: transform var(--duration-press) var(--ease-out); }
+@media (hover: hover) and (pointer: fine) {
+  .swatch:hover { transform: scale(1.1); }
 }
 
 /* Skeletons match the shape of what is loading, so the page does not jump when
