@@ -358,8 +358,13 @@ function UnmatchedRow({
           {n > 0 && `${n} commit${n === 1 ? "" : "s"}`}
           {n > 0 && runs.length > 0 && ", "}
           {/* A run knows how long it lasted, so say so — that is the number
-              being offered as a record, and it is more use than a count. */}
-          {runs.length > 0 && `${total(agentSeconds)} of agent work`}
+              being offered as a record, and it is more use than a count. Under
+              a minute there is no duration worth showing: "0m of agent work"
+              reads as a bug rather than as a very short turn. */}
+          {runs.length > 0 &&
+            (agentSeconds >= 60
+              ? `${total(agentSeconds)} of agent work`
+              : `${runs.length} agent run${runs.length === 1 ? "" : "s"}`)}
         </span>
         {" · "}
         {clusterDayLabel(cluster.from)}
