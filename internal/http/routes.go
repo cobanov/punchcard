@@ -120,6 +120,7 @@ func BuildRouter(d Deps) (*chi.Mux, huma.API) {
 	d.registerReportRoutes(api)
 	d.registerGitHubRoutes(api)
 	d.registerAgentRunRoutes(api)
+	d.registerAttributionRoutes(api)
 	d.registerAccountRoutes(api)
 	d.registerWebhookRoutes(api)
 

@@ -13,6 +13,8 @@ package service
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"path"
 	"sort"
 	"strings"
@@ -20,6 +22,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/cobanov/punchcard/internal/auth"
 	"github.com/cobanov/punchcard/internal/repo/db"
 )
 
@@ -354,4 +357,85 @@ func unionMicros(spans [][2]int64) int64 {
 		}
 	}
 	return total + (curT - curF)
+}
+
+// newResolver loads the user's current projects and links. Archived projects
+// resolve like any other — archiving affects the timer's picker, not history —
+// and deleted ones are already excluded by the queries.
+func (d *Domain) newResolver(ctx context.Context, userID uuid.UUID) (*resolver, error) {
+	projects, err := d.store.ListProjects(ctx, db.ListProjectsParams{OwnerID: userID, IncludeArchived: true})
+	if err != nil {
+		return nil, fmt.Errorf("list projects: %w", err)
+	}
+	links, err := d.store.ListReposForUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list repo links: %w", err)
+	}
+	return buildResolver(projects, links), nil
+}
+
+// sessionSpans turns a session's attached evidence into resolved spans.
+// A run is a real interval; a commit is an instant that vouches for the
+// fifteen minutes leading to it — the same clusterLeadIn the unmatched
+// clustering uses, one idea with one number. Clipping happens in apportion.
+func (d *Domain) sessionSpans(ctx context.Context, r *resolver, sessionID uuid.UUID) ([]evidenceSpan, error) {
+	commits, err := d.store.ListCommitsForSession(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("list commits: %w", err)
+	}
+	runs, err := d.store.ListAgentRunsForSession(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("list agent runs: %w", err)
+	}
+	spans := make([]evidenceSpan, 0, len(commits)+len(runs))
+	for _, c := range commits {
+		pid, reason, key := r.resolve(c.RepoFullName, "")
+		spans = append(spans, evidenceSpan{
+			project: pid, reason: reason, key: key, fullName: c.RepoFullName,
+			from: c.CommittedAt.Add(-clusterLeadIn).UnixMicro(), to: c.CommittedAt.UnixMicro(),
+		})
+	}
+	for _, run := range runs {
+		pid, reason, key := r.resolve(run.RepoFullName, run.Cwd)
+		spans = append(spans, evidenceSpan{
+			project: pid, reason: reason, key: key, fullName: run.RepoFullName,
+			from: run.StartedAt.UnixMicro(), to: run.EndedAt.UnixMicro(),
+		})
+	}
+	return spans, nil
+}
+
+// NamedAllocation is an Allocation with its project's name, so a handler does
+// not build a second resolver just to label rows.
+type NamedAllocation struct {
+	Allocation
+	Name string
+}
+
+// SessionAttributionNamed is the per-session breakdown: how the session's
+// wall-clock divides across projects, and which places nobody claims.
+// A running session is read up to now — the breakdown is a view, not a record.
+func (d *Domain) SessionAttributionNamed(ctx context.Context, p *auth.Principal, sessionID uuid.UUID) ([]NamedAllocation, []UnresolvedPlace, error) {
+	ws, err := d.GetSession(ctx, p, sessionID)
+	if err != nil {
+		return nil, nil, err
+	}
+	end := time.Now().UTC()
+	if ws.EndedAt != nil {
+		end = *ws.EndedAt
+	}
+	r, err := d.newResolver(ctx, p.UserID)
+	if err != nil {
+		return nil, nil, err
+	}
+	spans, err := d.sessionSpans(ctx, r, ws.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	allocs, unres := apportion(ws.ProjectID, ws.StartedAt, end, spans)
+	named := make([]NamedAllocation, 0, len(allocs))
+	for _, a := range allocs {
+		named = append(named, NamedAllocation{Allocation: a, Name: r.projectName(a.ProjectID)})
+	}
+	return named, unres, nil
 }
