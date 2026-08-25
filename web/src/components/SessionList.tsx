@@ -44,13 +44,13 @@ export function SessionList({ sessions, commits, projects, onSave, onDelete, bus
     // One template for the header and every row below it. The commit cell is a
     // fixed track rather than a badge that sizes itself, so the note beside it
     // truncates at the same pixel on every row.
-    <div style={{ "--tbl-cols": "5.5rem 9rem minmax(0, 1fr) 3.5rem 3.5rem" } as CSSProperties}>
-      <div className="tbl-head" aria-hidden>
+    <div style={{ "--tbl-cols": "5.5rem 9rem minmax(0, 1fr) 3.5rem 4.5rem" } as CSSProperties}>
+      <div className="tbl-head">
         <span>Time</span>
         <span>Project</span>
         <span>Note</span>
         <span className="text-center">Commits</span>
-        <span className="truncate text-right">Duration</span>
+        <span className="text-right">Duration</span>
       </div>
       <ul className="divide-y divide-line">
       {finished.map((session) => {

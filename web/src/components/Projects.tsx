@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { api, type Project, type Repo } from "../lib/api";
 import { money } from "../lib/format";
 
@@ -39,19 +39,32 @@ export function Projects({ projects, onChange }: { projects: Project[]; onChange
         </p>
       )}
 
-      <div className="panel">
+      <div
+        className="panel"
+        style={{ "--tbl-cols": "minmax(0, 1fr) 9rem 7rem 4rem" } as CSSProperties}
+      >
+        <div className="tbl-head">
+          <span>Project</span>
+          <span>Client</span>
+          <span className="text-right">Rate</span>
+          <span />
+        </div>
         <ul className="divide-y divide-line">
           {projects.map((project) => (
             <li key={project.id}>
-              <div className="flex items-center gap-3 px-3 py-2">
+              <div className="tbl-row">
+                {/* The name is the disclosure control on its own. It used to be
+                    one button wrapping both name and client, which meant those
+                    two could not sit in separate grid tracks and the row drifted
+                    out of line with its header. */}
                 <button
                   onClick={() => setOpen(open === project.id ? null : project.id)}
                   aria-expanded={open === project.id}
-                  className="flex min-w-0 flex-1 items-baseline gap-3 text-left"
+                  className="truncate text-left font-medium transition-colors hover:text-punch"
                 >
-                  <span className="w-40 shrink-0 truncate font-medium">{project.name}</span>
-                  <span className="min-w-0 flex-1 truncate text-dim">{project.client}</span>
+                  {project.name}
                 </button>
+                <span className="truncate text-dim">{project.client || "—"}</span>
                 <RateCell project={project} onSave={(body) => run(() => api.updateProject(project.id, body))} />
                 <button
                   onClick={() =>
@@ -59,7 +72,7 @@ export function Projects({ projects, onChange }: { projects: Project[]; onChange
                     run(() => api.deleteProject(project.id))
                   }
                   aria-label={`Archive ${project.name}`}
-                  className="btn-bare t-body"
+                  className="btn-bare t-caption text-right"
                 >
                   archive
                 </button>
@@ -103,7 +116,7 @@ function RateCell({
           setEditing(true);
         }}
         title="Change the hourly rate"
-        className="tnum w-28 shrink-0 text-right font-mono t-body text-dim transition-colors hover:text-text"
+        className="tbl-num t-body text-dim transition-colors hover:text-text"
       >
         {shown}
       </button>
@@ -135,7 +148,7 @@ function RateCell({
       inputMode="decimal"
       aria-label={`Hourly rate for ${project.name}, in ${project.currency}`}
       placeholder="empty = none"
-      className="field w-28 shrink-0 py-0.5 text-right font-mono t-body"
+      className="field tbl-num w-full py-0.5 t-body"
     />
   );
 }

@@ -145,7 +145,10 @@ export function App() {
   if (!signedIn) return <SignIn />;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 pb-20 pt-6">
+    // 4xl, not 2xl. The columns are fixed widths now, so everything the narrower
+    // shell took came out of the note — the one column that holds a sentence.
+    // At 672px a note truncated after roughly four words.
+    <div className="mx-auto max-w-4xl px-4 pb-20 pt-6">
       {/* One row, three groups, aligned on a single centre line. The wordmark
           and the tabs share a baseline; the account sits at the far end. */}
       <header className="mb-5 flex h-8 items-center gap-4">
@@ -357,7 +360,7 @@ function GitHubNote({ status }: { status: GitHubStatus | null }) {
  *  when the real thing lands. */
 function LoadingScreen() {
   return (
-    <div className="mx-auto max-w-2xl px-4 pt-6">
+    <div className="mx-auto max-w-4xl px-4 pt-6">
       <div className="mb-5 flex h-8 items-center gap-4">
         <span className="shrink-0 font-semibold tracking-tight">punchcard</span>
         <div className="skeleton h-7 w-52" />
