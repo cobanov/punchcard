@@ -252,7 +252,7 @@ func (d Deps) registerMeRoutes(api huma.API) {
 		Body struct {
 			Name             string     `json:"name" minLength:"1" maxLength:"100"`
 			Scope            string     `json:"scope" enum:"read,read_write"`
-			ScopedProjectIDs []string   `json:"scoped_list_ids,omitempty" doc:"Restrict to these list ids; omit for all."`
+			ScopedProjectIDs []string   `json:"scoped_project_ids,omitempty" doc:"Restrict to these project ids; omit for all."`
 			ExpiresAt        *time.Time `json:"expires_at,omitempty" doc:"Optional expiry, RFC 3339 UTC."`
 		}
 	}) (*struct {
@@ -269,7 +269,7 @@ func (d Deps) registerMeRoutes(api huma.API) {
 		for _, s := range in.Body.ScopedProjectIDs {
 			id, perr := uuid.Parse(s)
 			if perr != nil {
-				return nil, NewProblem(422, "validation_failed", "scoped_list_ids must be valid uuids")
+				return nil, NewProblem(422, "validation_failed", "scoped_project_ids must be valid uuids")
 			}
 			listIDs = append(listIDs, id)
 		}

@@ -45,7 +45,7 @@ type TokenDTO struct {
 	Name             string     `json:"name"`
 	Prefix           string     `json:"prefix"`
 	Scope            string     `json:"scope"`
-	ScopedProjectIDs []string   `json:"scoped_list_ids,omitempty"`
+	ScopedProjectIDs []string   `json:"scoped_project_ids,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
 	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
 	LastUsedAt       *time.Time `json:"last_used_at,omitempty"`

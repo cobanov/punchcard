@@ -113,6 +113,7 @@ func BuildRouter(d Deps) (*chi.Mux, huma.API) {
 	api := humachi.New(r, humaConfig(d.Config))
 	d.registerAuthRoutes(api)
 	d.registerMeRoutes(api)
+	d.registerProjectRoutes(api)
 	d.registerAccountRoutes(api)
 	d.registerWebhookRoutes(api)
 
