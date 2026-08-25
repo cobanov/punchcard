@@ -17,6 +17,12 @@ testcontainers · Docker Compose.
 
 **Spec:** `docs/superpowers/specs/2026-08-25-punchcard-design.md`
 
+**Durum (2026-08-25):** Görev 1–17 tamamlandı; Görev 18 kısmen — servis
+`https://punchcard.cobanov.run` adresinde canlı, uçtan uca doğrulandı (kayıt,
+proje, timer, düzeltme, rapor, CSV, SSE). Kalan tek adım GitHub OAuth App'in
+oluşturulup gerçek bir hesapla commit eşlemesinin canlıda görülmesi — sahte
+sunucuya karşı geçen testler gerçek API'nin davranışını kanıtlamaz.
+
 ## Genel kısıtlar
 
 Her görevin gereksinimleri bunları kapsar:
