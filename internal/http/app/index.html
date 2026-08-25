@@ -93,6 +93,25 @@
   li.repos .chip { background: var(--code-bg); padding: .1rem .45rem; border-radius: 4px;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
+  /* Unmatched commits — the recovery path for a timer nobody started. */
+  li.cluster { padding: .7rem .2rem; border-bottom: 1px solid var(--rule); }
+  li.cluster .head { display: flex; gap: .9rem; align-items: baseline; margin-bottom: .45rem; }
+  li.cluster .span { color: var(--muted); font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; flex: 0 0 6.5rem; }
+  li.cluster .what { flex: 1 1 auto; min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  li.cluster .count { flex: 0 0 auto; color: var(--muted); font-size: .88rem; }
+  li.cluster form { display: flex; gap: .5rem; align-items: center; padding-left: 7.4rem; flex-wrap: wrap; }
+  li.cluster input, li.cluster select {
+    border: 1px solid var(--rule); background: var(--panel); color: var(--fg);
+    font: inherit; padding: .35rem .55rem; border-radius: 6px; min-width: 0;
+  }
+  li.cluster input { flex: 1 1 16rem; }
+  li.cluster button {
+    border: 0; border-radius: 6px; padding: .38rem .9rem; font: 600 inherit;
+    cursor: pointer; background: var(--accent); color: var(--accent-fg);
+  }
+
   form.inline { display: flex; gap: .5rem; padding: .8rem .2rem; flex-wrap: wrap; align-items: center; }
   form.inline input, form.inline select {
     border: 1px solid var(--rule); background: var(--panel); color: var(--fg);
@@ -141,7 +160,7 @@
 // means every mutation carries the CSRF token the server handed us.
 
 const $ = (sel) => document.querySelector(sel);
-const state = { projects: [], repos: {}, current: null, today: [], commits: {}, github: null, error: null };
+const state = { projects: [], repos: {}, current: null, today: [], commits: {}, unmatched: [], github: null, error: null };
 
 const csrf = () =>
   document.cookie.split('; ').find((c) => c.startsWith('punchcard_csrf='))?.split('=')[1] ?? '';
@@ -217,6 +236,16 @@ async function load() {
     state.github = github;
     state.current = state.today.find((s) => s.running) ?? null;
     state.error = null;
+
+    // Unmatched commits over the last week — the same span the server re-scans,
+    // and long enough that a timer forgotten on Friday is still recoverable on
+    // Monday. A failure here must not stop the rest of the page.
+    try {
+      const week = new Date(Date.now() - 7 * 864e5).toISOString();
+      const to = new Date().toISOString();
+      state.unmatched = (await api(
+        `/v1/github/unmatched?from=${encodeURIComponent(week)}&to=${encodeURIComponent(to)}`)).clusters ?? [];
+    } catch { state.unmatched = []; }
 
     // Linked repositories, per project. Optional to have, so a failure here
     // must not stop the page rendering.
@@ -296,6 +325,25 @@ async function editRate(id, current) {
     : { hourly_rate_cents: Math.round(parseFloat(typed) * 100) };
   try { await api(`/v1/projects/${id}`, { method: 'PATCH', body }); }
   catch (err) { state.error = err.message; }
+  await load();
+}
+
+async function recover(event, index) {
+  event.preventDefault();
+  const cluster = state.unmatched[index];
+  if (!cluster) return;
+  const form = event.target;
+  try {
+    await api('/v1/github/unmatched/recover', {
+      method: 'POST',
+      body: {
+        project_id: form.project.value,
+        from: cluster.from,
+        to: cluster.to,
+        note: form.note.value.trim(),
+      },
+    });
+  } catch (err) { state.error = err.message; }
   await load();
 }
 
@@ -387,6 +435,54 @@ function todayList() {
 
 const money = (cents) => (cents / 100).toFixed(2);
 
+const dayLabel = (iso) => {
+  const d = new Date(iso), today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (d >= today) return '';
+  return d.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' ';
+};
+
+/** Work that happened while no timer was running.
+ *
+ *  This is the other half of what punchcard is for. Forgetting to press start
+ *  is the one failure a live timer cannot prevent, and guessing at it — idle
+ *  detection and the like — is guessing. The commits are already there, already
+ *  timestamped, and they say exactly when the work happened. So rather than
+ *  infer, show the evidence and offer to write the record. */
+function unmatchedSection() {
+  if (!state.unmatched.length) return '';
+
+  const options = (selected) => state.projects.map((p) =>
+    `<option value="${escape(p.id)}"${p.id === selected ? ' selected' : ''}>${escape(p.name)}</option>`
+  ).join('');
+
+  const rows = state.unmatched.map((cluster, index) => {
+    const span = `${dayLabel(cluster.from)}${hhmm(cluster.from)}–${hhmm(cluster.to)}`;
+    const repos = (cluster.repos ?? []).join(', ');
+    const n = (cluster.commits ?? []).length;
+    return `
+      <li class="cluster">
+        <div class="head">
+          <span class="span">${escape(span)}</span>
+          <span class="what">${escape(repos)}</span>
+          <span class="count">${n} commit${n === 1 ? '' : 's'}</span>
+        </div>
+        <form onsubmit="recover(event, ${index})">
+          <select name="project">${options(cluster.suggested_project_id)}</select>
+          <input name="note" value="${escape(cluster.suggested_note ?? '')}" placeholder="What was this?">
+          <button>Record</button>
+        </form>
+      </li>`;
+  }).join('');
+
+  return `
+    <h2>Unmatched commits <span class="total">last 7 days</span></h2>
+    <p class="note-line" style="padding:.2rem">
+      Work with no timer running. The commits say when it happened.
+    </p>
+    <ul>${rows}</ul>`;
+}
+
 function projectsSection() {
   const rows = state.projects.map((p) => {
     const rate = p.hourly_rate_cents == null || !p.billable
@@ -449,7 +545,7 @@ function render(html) {
   $('#who').textContent = state.github?.login ? `@${state.github.login}` : '';
   $('#root').innerHTML =
     (state.error ? `<div class="err">${escape(state.error)}</div>` : '') +
-    bar() + todayList() + projectsSection() + githubNote();
+    bar() + todayList() + unmatchedSection() + projectsSection() + githubNote();
 }
 
 // The running clock ticks locally; the data refreshes on its own schedule.
