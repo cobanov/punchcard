@@ -251,3 +251,85 @@ func TestJSONOutputIsMachineReadable(t *testing.T) {
 		t.Fatalf("decoded = %+v", decoded)
 	}
 }
+
+// The rate is typed the way a person says it and stored the way money is kept.
+// A CLI that made the user type 250000 for 2500/hour would be exporting the
+// database's representation as the user interface.
+func TestNewProjectConvertsTheRateToMinorUnits(t *testing.T) {
+	api := newScriptedAPI(t)
+	api.route("POST /v1/projects", map[string]any{
+		"id": "p1", "name": "capsarsiv", "currency": "TRY", "billable": true,
+	})
+	app, _, _ := newApp(t, api)
+
+	if err := app.NewProject("capsarsiv", "Acme", "2500", "TRY"); err != nil {
+		t.Fatalf("new project: %v", err)
+	}
+	sent := api.posts[len(api.posts)-1]
+	if sent["hourly_rate_cents"] != float64(250000) {
+		t.Fatalf("hourly_rate_cents = %v, want 250000", sent["hourly_rate_cents"])
+	}
+	if sent["client"] != "Acme" {
+		t.Fatalf("client = %v", sent["client"])
+	}
+}
+
+// A fractional rate must not lose a kuruş to floating point.
+func TestNewProjectRoundsAFractionalRate(t *testing.T) {
+	api := newScriptedAPI(t)
+	api.route("POST /v1/projects", map[string]any{"id": "p1", "name": "x", "currency": "TRY"})
+	app, _, _ := newApp(t, api)
+
+	if err := app.NewProject("x", "", "333.33", "TRY"); err != nil {
+		t.Fatalf("new project: %v", err)
+	}
+	if got := api.posts[len(api.posts)-1]["hourly_rate_cents"]; got != float64(33333) {
+		t.Fatalf("hourly_rate_cents = %v, want 33333", got)
+	}
+}
+
+// No rate is not a rate of zero: a project with no rate must not be sent as
+// costed at nothing.
+func TestNewProjectWithoutARateSendsNone(t *testing.T) {
+	api := newScriptedAPI(t)
+	api.route("POST /v1/projects", map[string]any{"id": "p1", "name": "x", "currency": "TRY"})
+	app, _, _ := newApp(t, api)
+
+	if err := app.NewProject("x", "", "", ""); err != nil {
+		t.Fatalf("new project: %v", err)
+	}
+	if _, present := api.posts[len(api.posts)-1]["hourly_rate_cents"]; present {
+		t.Fatal("an unset rate must be absent, not zero")
+	}
+}
+
+func TestNewProjectRejectsANonNumericRate(t *testing.T) {
+	api := newScriptedAPI(t)
+	app, _, _ := newApp(t, api)
+	if err := app.NewProject("x", "", "bedava", ""); err == nil {
+		t.Fatal("a rate that is not a number must be refused")
+	}
+}
+
+// Linking resolves the project prefix like every other command.
+func TestLinkRepoResolvesTheProjectPrefix(t *testing.T) {
+	api := newScriptedAPI(t)
+	api.route("GET /v1/projects", map[string]any{"projects": []any{
+		map[string]any{"id": "p1", "name": "capsarsiv", "currency": "TRY", "billable": true},
+	}})
+	api.route("POST /v1/projects/p1/repos", map[string]any{
+		"id": "r1", "project_id": "p1", "full_name": "cobanov/capsarsiv",
+	})
+	app, out, _ := newApp(t, api)
+
+	if err := app.LinkRepo("caps", "cobanov/capsarsiv"); err != nil {
+		t.Fatalf("link: %v", err)
+	}
+	if !strings.Contains(out.String(), "cobanov/capsarsiv") {
+		t.Fatalf("output = %q", out)
+	}
+	// Saying it is optional is the point — otherwise it reads as a required step.
+	if !strings.Contains(out.String(), "optional") {
+		t.Fatalf("linking must be presented as optional:\n%s", out)
+	}
+}

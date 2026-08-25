@@ -88,6 +88,32 @@ func (c *Client) Projects(includeArchived bool) ([]Project, error) {
 	return out.Projects, nil
 }
 
+// CreateProject makes a project. rateCents is nil for a project with no rate,
+// which is not the same as a rate of zero.
+func (c *Client) CreateProject(name, client, currency string, rateCents *int64) (Project, error) {
+	body := map[string]any{"name": name}
+	if client != "" {
+		body["client"] = client
+	}
+	if currency != "" {
+		body["currency"] = currency
+	}
+	if rateCents != nil {
+		body["hourly_rate_cents"] = *rateCents
+	}
+	var p Project
+	if err := c.do(http.MethodPost, "/v1/projects", body, &p); err != nil {
+		return Project{}, err
+	}
+	return p, nil
+}
+
+// LinkRepo attaches a GitHub repository to a project.
+func (c *Client) LinkRepo(projectID, fullName string) error {
+	return c.do(http.MethodPost, "/v1/projects/"+projectID+"/repos",
+		map[string]any{"full_name": fullName}, nil)
+}
+
 // Start opens a timer, closing whatever was running.
 func (c *Client) Start(projectID, note string) (Session, error) {
 	var ws Session

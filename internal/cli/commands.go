@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -110,6 +112,61 @@ func (a *App) Projects() error {
 		}
 		a.printf("%-*s  %-20s %s\n", width, p.Name, truncate(p.Client, 20), rate)
 	}
+	return nil
+}
+
+// NewProject creates a project.
+//
+// The rate is given in whole currency units because that is how a person says
+// it — "2500" for 2500 lira an hour — and converted to minor units here. The
+// API never sees a decimal, and no float ever reaches the database.
+func (a *App) NewProject(name, client, rate, currency string) error {
+	c, _, err := a.client()
+	if err != nil {
+		return err
+	}
+	var cents *int64
+	if strings.TrimSpace(rate) != "" {
+		value, perr := strconv.ParseFloat(strings.TrimSpace(rate), 64)
+		if perr != nil || value < 0 {
+			return fmt.Errorf("rate %q is not a number", rate)
+		}
+		v := int64(math.Round(value * 100))
+		cents = &v
+	}
+	project, err := c.CreateProject(name, client, currency, cents)
+	if err != nil {
+		return err
+	}
+	if a.JSON {
+		return a.writeJSON(project)
+	}
+	a.printf("created %s\n", project.Name)
+	return nil
+}
+
+// LinkRepo attaches a repository to a project.
+func (a *App) LinkRepo(projectQuery, fullName string) error {
+	c, _, err := a.client()
+	if err != nil {
+		return err
+	}
+	projects, err := c.Projects(false)
+	if err != nil {
+		return err
+	}
+	project, err := resolveProject(projects, projectQuery)
+	if err != nil {
+		return err
+	}
+	if err := c.LinkRepo(project.ID, fullName); err != nil {
+		return err
+	}
+	a.printf("%s → %s\n", project.Name, fullName)
+	// Linking is a refinement, not a requirement, and saying so here stops it
+	// looking like a step everyone has to perform.
+	a.println("  (optional: punchcard finds the repositories you push to on its own;")
+	a.println("   linking helps it guess which project unmatched commits belong to)")
 	return nil
 }
 

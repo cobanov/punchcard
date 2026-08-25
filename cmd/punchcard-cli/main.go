@@ -64,6 +64,18 @@ func run() int {
 		cmdErr = app.Logout()
 	case "projects", "p":
 		cmdErr = app.Projects()
+	case "new", "n":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, `usage: punchcard new <name> [client] [rate-per-hour] [currency]`)
+			return 2
+		}
+		cmdErr = app.NewProject(args[1], argAt(args, 2), argAt(args, 3), argAt(args, 4))
+	case "link":
+		if len(args) < 3 {
+			fmt.Fprintln(os.Stderr, `usage: punchcard link <project> <owner/repo>`)
+			return 2
+		}
+		cmdErr = app.LinkRepo(args[1], args[2])
 	case "start", "s":
 		if len(args) < 2 {
 			fmt.Fprintln(os.Stderr, `usage: punchcard start <project> ["what you are doing"]`)
@@ -102,6 +114,14 @@ func run() int {
 	return 0
 }
 
+// argAt returns args[i] or "" — the optional positional arguments of `new`.
+func argAt(args []string, i int) string {
+	if i < len(args) {
+		return args[i]
+	}
+	return ""
+}
+
 func usage() {
 	fmt.Fprint(os.Stderr, `punchcard — time tracking for developers
 
@@ -117,6 +137,11 @@ Commands:
   today                      Today's records with their commits
   week                       The last seven days
   projects                   List projects
+  new <name> [client] [rate] [currency]
+                             Create a project
+  link <project> <owner/repo>
+                             Link a repository (optional; it helps punchcard
+                             guess which project unmatched commits belong to)
   version                    Print the version
 
 Flags:
@@ -124,6 +149,7 @@ Flags:
   --url=<base>               Talk to another instance (or set PUNCHCARD_URL)
 
 Examples:
+  punchcard new capsarsiv Acme 2500 TRY
   punchcard start caps "yorum sistemi refactor"
   punchcard stop
   punchcard today

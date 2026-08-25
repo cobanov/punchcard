@@ -51,6 +51,7 @@ go install github.com/cobanov/punchcard/cmd/punchcard-cli@latest
 alias punchcard=punchcard-cli      # or rename the binary
 
 punchcard login                    # opens the browser once
+punchcard new capsarsiv Acme 2500 TRY
 punchcard start caps "yorum sistemi refactor"
 punchcard status
 punchcard stop

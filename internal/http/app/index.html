@@ -77,6 +77,36 @@
   .sha { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
   .empty, .note-line { color: var(--muted); padding: .8rem .2rem; }
+
+  /* Projects */
+  li.project-row { display: flex; gap: .9rem; align-items: baseline;
+    padding: .6rem .2rem; border-bottom: 1px solid var(--rule); }
+  li.project-row .name { flex: 0 0 10rem; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  li.project-row .client { flex: 1 1 auto; color: var(--muted); min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  li.project-row .rate { flex: 0 0 auto; color: var(--muted);
+    font-variant-numeric: tabular-nums; font-size: .88rem; }
+  li.project-row .actions { flex: 0 0 auto; display: flex; gap: .6rem; }
+  li.repos { padding: 0 .2rem .55rem 11rem; border-bottom: 1px solid var(--rule);
+    color: var(--muted); font-size: .82rem; display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+  li.repos .chip { background: var(--code-bg); padding: .1rem .45rem; border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  form.inline { display: flex; gap: .5rem; padding: .8rem .2rem; flex-wrap: wrap; align-items: center; }
+  form.inline input, form.inline select {
+    border: 1px solid var(--rule); background: var(--panel); color: var(--fg);
+    font: inherit; padding: .45rem .6rem; border-radius: 6px; min-width: 0;
+  }
+  form.inline input.name { flex: 1 1 10rem; }
+  form.inline input.client { flex: 1 1 8rem; }
+  form.inline input.rate { flex: 0 0 8rem; }
+  form.inline input.repo { flex: 1 1 14rem; }
+  form.inline button {
+    border: 0; border-radius: 6px; padding: .5rem 1rem; font: 600 inherit;
+    cursor: pointer; background: var(--accent); color: var(--accent-fg);
+  }
+  .field-note { color: var(--muted); font-size: .8rem; width: 100%; margin: -.3rem 0 0; }
   .err {
     background: var(--code-bg); border-left: 3px solid var(--accent);
     padding: .7rem .9rem; border-radius: 0 6px 6px 0; margin: 1rem 0;
@@ -111,7 +141,7 @@
 // means every mutation carries the CSRF token the server handed us.
 
 const $ = (sel) => document.querySelector(sel);
-const state = { projects: [], current: null, today: [], commits: {}, github: null, error: null };
+const state = { projects: [], repos: {}, current: null, today: [], commits: {}, github: null, error: null };
 
 const csrf = () =>
   document.cookie.split('; ').find((c) => c.startsWith('punchcard_csrf='))?.split('=')[1] ?? '';
@@ -188,6 +218,13 @@ async function load() {
     state.current = state.today.find((s) => s.running) ?? null;
     state.error = null;
 
+    // Linked repositories, per project. Optional to have, so a failure here
+    // must not stop the page rendering.
+    await Promise.all(state.projects.map(async (p) => {
+      try { state.repos[p.id] = (await api(`/v1/projects/${p.id}/repos`)).repos; }
+      catch { state.repos[p.id] = []; }
+    }));
+
     // Commit counts are per session; fetch them for the finished ones only.
     await Promise.all(state.today.filter((s) => !s.running).map(async (s) => {
       try { state.commits[s.id] = (await api(`/v1/sessions/${s.id}/commits`)).commits; }
@@ -220,6 +257,62 @@ async function start() {
 async function stop() {
   if (!state.current) return;
   try { await api(`/v1/sessions/${state.current.id}/stop`, { method: 'POST', body: {} }); }
+  catch (err) { state.error = err.message; }
+  await load();
+}
+
+async function createProject(event) {
+  event.preventDefault();
+  const form = event.target;
+  const name = form.name.value.trim();
+  if (!name) return;
+
+  // The rate is typed in whole currency units because that is how people say
+  // it; the API takes minor units, because money is never a float here.
+  const typed = form.rate.value.trim();
+  const body = { name, client: form.client.value.trim(), currency: form.currency.value };
+  if (typed) body.hourly_rate_cents = Math.round(parseFloat(typed) * 100);
+
+  try {
+    await api('/v1/projects', { method: 'POST', body });
+    form.reset();
+  } catch (err) { state.error = err.message; }
+  await load();
+}
+
+async function archiveProject(id, name) {
+  if (!confirm(`Archive “${name}”? Its recorded time is kept.`)) return;
+  try { await api(`/v1/projects/${id}`, { method: 'DELETE' }); }
+  catch (err) { state.error = err.message; }
+  await load();
+}
+
+async function editRate(id, current) {
+  const typed = prompt('Hourly rate, in whole units. Empty to remove it.',
+    current == null ? '' : (current / 100).toFixed(2));
+  if (typed === null) return;
+  const body = typed.trim() === ''
+    ? { clear_hourly_rate: true }
+    : { hourly_rate_cents: Math.round(parseFloat(typed) * 100) };
+  try { await api(`/v1/projects/${id}`, { method: 'PATCH', body }); }
+  catch (err) { state.error = err.message; }
+  await load();
+}
+
+async function linkRepo(event, projectID) {
+  event.preventDefault();
+  const input = event.target.repo;
+  const fullName = input.value.trim();
+  if (!fullName) return;
+  try {
+    await api(`/v1/projects/${projectID}/repos`, { method: 'POST', body: { full_name: fullName } });
+    input.value = '';
+  } catch (err) { state.error = err.message; }
+  await load();
+}
+
+async function unlinkRepo(projectID, repoID) {
+  try { await api(`/v1/projects/${projectID}/repos/${repoID}`, { method: 'DELETE' }); }
   catch (err) { state.error = err.message; }
   await load();
 }
@@ -292,6 +385,54 @@ function todayList() {
     <ul>${rows}</ul>`;
 }
 
+const money = (cents) => (cents / 100).toFixed(2);
+
+function projectsSection() {
+  const rows = state.projects.map((p) => {
+    const rate = p.hourly_rate_cents == null || !p.billable
+      ? '—'
+      : `${money(p.hourly_rate_cents)} ${escape(p.currency)}/h`;
+    const repos = (state.repos[p.id] ?? []).map((r) =>
+      `<span class="chip">${escape(r.full_name)}
+         <button class="link" onclick="unlinkRepo('${escape(p.id)}','${escape(r.id)}')"
+                 title="Unlink">×</button></span>`).join(' ');
+    return `
+      <li class="project-row">
+        <span class="name">${escape(p.name)}</span>
+        <span class="client">${escape(p.client || '')}</span>
+        <span class="rate">${rate}</span>
+        <span class="actions">
+          <button class="link" onclick="editRate('${escape(p.id)}', ${p.hourly_rate_cents ?? 'null'})">rate</button>
+          <button class="link" onclick="archiveProject('${escape(p.id)}', '${escape(p.name)}')">archive</button>
+        </span>
+      </li>
+      <li class="repos">
+        ${repos || '<span>no repositories linked</span>'}
+        <form class="inline" style="padding:0" onsubmit="linkRepo(event, '${escape(p.id)}')">
+          <input class="repo" name="repo" placeholder="owner/repo" style="padding:.2rem .4rem">
+          <button style="padding:.2rem .6rem">link</button>
+        </form>
+      </li>`;
+  }).join('');
+
+  return `
+    <h2>Projects</h2>
+    <ul>${rows}</ul>
+    <form class="inline" onsubmit="createProject(event)">
+      <input class="name" name="name" placeholder="New project" required>
+      <input class="client" name="client" placeholder="Client (optional)">
+      <input class="rate" name="rate" placeholder="Rate / hour" inputmode="decimal">
+      <select name="currency">
+        <option>TRY</option><option>USD</option><option>EUR</option><option>GBP</option>
+      </select>
+      <button>Add</button>
+      <p class="field-note">
+        Linking a repository is optional — punchcard finds the ones you pushed to.
+        Link one when you want it to guess which project a stretch of commits belongs to.
+      </p>
+    </form>`;
+}
+
 function githubNote() {
   const gh = state.github;
   if (!gh) return '';
@@ -308,7 +449,7 @@ function render(html) {
   $('#who').textContent = state.github?.login ? `@${state.github.login}` : '';
   $('#root').innerHTML =
     (state.error ? `<div class="err">${escape(state.error)}</div>` : '') +
-    bar() + todayList() + githubNote();
+    bar() + todayList() + projectsSection() + githubNote();
 }
 
 // The running clock ticks locally; the data refreshes on its own schedule.
