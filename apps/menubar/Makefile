@@ -41,7 +41,7 @@ NOTARY_PROFILE := ghbar
 SIGN_KEYCHAIN := $(HOME)/Library/Keychains/ghbar-signing.keychain-db
 KC_PASS_FILE  := $(HOME)/.ghbar-signing/.kcpass
 
-.PHONY: all build test run icon bundle sign unlock notarize zip install clean
+.PHONY: all build test run icon bundle sign unlock notarize zip install install-release clean
 
 all: build
 
@@ -142,6 +142,20 @@ install: bundle
 	cp -R $(APP_BUNDLE) /Applications/punchcard.app
 	open /Applications/punchcard.app
 	@echo "installed and launched"
+
+# Installs whatever is already in build/ WITHOUT rebuilding.
+#
+# `install` rebuilds, and rebuilding replaces the binary — which throws away the
+# signature and the stapled notarization ticket with it. After `make notarize`,
+# this is the target that puts the notarized app in place.
+install-release:
+	@test -d $(APP_BUNDLE) || { echo "no $(APP_BUNDLE) — run make notarize first"; exit 1; }
+	@pkill -x $(APP) || true
+	@rm -rf /Applications/punchcard.app
+	cp -R $(APP_BUNDLE) /Applications/punchcard.app
+	@echo "--- what is now installed ---"
+	@spctl --assess --type execute --verbose=4 /Applications/punchcard.app
+	open /Applications/punchcard.app
 
 clean:
 	rm -rf $(BUILD_DIR) .build
