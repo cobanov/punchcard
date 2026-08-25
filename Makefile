@@ -30,6 +30,21 @@ tools: ## Install pinned dev tools into $GOPATH/bin
 	go install github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION)
 
 .PHONY: build
+web: ## Build the web app into internal/http/webui/dist (commit the result)
+# The binary serves the EMBEDDED dist, not web/dist. After a frontend change you
+# must run this AND restart the server, or you will be looking at the previous
+# build and wondering why nothing changed.
+#
+# Never write `make web && pkill -f "punchcard serve"`: make web fails on a type
+# error, && skips the kill, and the OLD server keeps answering with the OLD
+# bundle — which looks exactly like the change not working.
+	cd web && npm ci --silent && npm run build
+
+.PHONY: web-check
+web-check: ## Typecheck the web app
+	cd web && npx tsc -b --noEmit
+
+.PHONY: cli
 cli: ## Install the punchcard CLI into $GOPATH/bin
 	go install -ldflags "-X main.version=$(VERSION)" ./cmd/punchcard-cli
 	@echo "installed: $(GOBIN)/punchcard-cli — rename or alias it to 'punchcard'"

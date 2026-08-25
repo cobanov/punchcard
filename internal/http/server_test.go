@@ -143,14 +143,12 @@ func TestWebClientIsServed(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("GET /app = %d, want 200", resp.StatusCode)
 	}
-	// Self-contained: no build step means no external script or stylesheet to
-	// fetch, and nothing to go stale separately from the binary.
-	if strings.Contains(string(body), "<script src=") || strings.Contains(string(body), "<link rel=\"stylesheet\"") {
-		t.Fatal("the web client must not load external assets")
-	}
-	for _, needed := range []string{"/v1/sessions", "/v1/projects", "X-CSRF-Token"} {
-		if !strings.Contains(string(body), needed) {
-			t.Fatalf("the web client does not reference %s", needed)
+	// Everything the page needs is served from this binary. A self-hosted
+	// instance must not depend on a CDN or a font host being reachable —
+	// including on a network where they are not.
+	for _, external := range []string{"https://cdn", "fonts.googleapis.com", "fonts.gstatic.com", "unpkg.com"} {
+		if strings.Contains(string(body), external) {
+			t.Fatalf("the web app must not load anything from %s", external)
 		}
 	}
 }

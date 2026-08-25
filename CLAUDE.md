@@ -22,6 +22,18 @@ this way, see `docs/superpowers/specs/2026-08-25-punchcard-design.md`.
 > (~6s). A sub-second pass is a failed run wearing green. OrbStack also has to be
 > *running*: `docker info` must answer before the suite means anything.
 
+> **The other trap, back again:** the binary serves the EMBEDDED `dist`
+> (`internal/http/webui/dist`), not `web/dist`. After a frontend change, run
+> `make web` **and restart the server**, or you are looking at the previous
+> build. Check with:
+> ```
+> curl -s localhost:8080/app | grep -o 'assets/index-[^"]*\.js'
+> ```
+> The served hash is the only thing that proves which build you are testing.
+> And never write `make web && pkill -f "punchcard serve"` — `make web` fails on
+> a type error, `&&` skips the kill, and the OLD server keeps answering with the
+> OLD bundle.
+
 **`make openapi` after any route change.** `openapi-check` fails the gate if
 `docs/openapi.json` drifts from the code, and the drift is easy to cause: adding
 a field to a handler's input struct changes the document.
@@ -136,6 +148,12 @@ lands, it replaces the landing page; it does not replace the NotFound handler,
 because an unmatched `/v1/...` path is still an API error.
 
 ## What was deliberately left behind
+
+The frontend toolchain came back in v1.1: `web/` is React + Vite + Tailwind v4,
+built into `internal/http/webui/dist` and embedded. It was left out of v1 on
+purpose and added on purpose — a live ticking timer, inline correction and a
+drawn timeline are where a component framework earns its cost, and the vanilla
+page it replaced had started growing `innerHTML` by the screenful.
 
 Ported from helva and then removed, so you do not go looking for them: lists,
 tasks, memberships, invites, the ordering (`position`) machinery, the activity

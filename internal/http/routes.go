@@ -13,9 +13,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/cobanov/punchcard/internal/config"
-	"github.com/cobanov/punchcard/internal/http/app"
 	"github.com/cobanov/punchcard/internal/http/landing"
 	"github.com/cobanov/punchcard/internal/http/legal"
+	"github.com/cobanov/punchcard/internal/http/webui"
 	"github.com/cobanov/punchcard/internal/oauth"
 	"github.com/cobanov/punchcard/internal/observability"
 	"github.com/cobanov/punchcard/internal/ratelimit"
@@ -128,9 +128,12 @@ func BuildRouter(d Deps) (*chi.Mux, huma.API) {
 	// service that read as broken to whoever opened it.
 	r.Get("/", landing.Handler())
 
-	// The web client. Small, static, and meant to be replaced — see
-	// internal/http/app.
-	r.Get("/app", app.Handler())
+	// The web application. Everything under /app, plus the fingerprinted assets
+	// it names, with a fallback to index.html so a hard refresh on a client
+	// route still lands somewhere.
+	r.Handle("/app", webui.Handler())
+	r.Handle("/app/*", webui.Handler())
+	r.Handle("/assets/*", webui.Handler())
 
 	// Legal documents. Public, unauthenticated, and served as their own HTML
 	// rather than as SPA routes: App Store Connect requires a reachable privacy

@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+/* IBM Plex, bundled rather than fetched.
+ *
+ * IBM made the punch card, which is where the product's name and its central
+ * image come from — so the typeface is not a neutral choice here, it is the
+ * subject's own. Bundling rather than linking Google Fonts keeps a self-hosted
+ * instance self-contained: no outbound request, nothing to fail on a corporate
+ * network, nothing that stops working offline. */
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+/* Graphite and amber.
+ *
+ * Dark first, because this is a tool that sits open next to an editor all day.
+ * The one accent is the colour of light coming through a punched hole — which
+ * is literally what the interface draws. It appears on the running timer, on
+ * commits, and on the primary action, and nowhere else: an accent that shows up
+ * everywhere stops meaning anything. */
+@theme {
+  --color-ink: #0e0f12;
+  --color-card: #16181d;
+  --color-raise: #1c1f26;
+  --color-line: #23262e;
+  --color-text: #e4e6eb;
+  --color-dim: #8b909c;
+  --color-faint: #5a5f6b;
+  --color-punch: #f0a93b;
+  --color-punch-dim: #7a5a24;
+  --color-ghost: #3d424e;
+
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* One hour of the day is this tall. Everything in the day card — band
+   * heights, punch positions, the hour rail — is derived from it, so the
+   * timeline stays honest: a two-hour session is exactly twice a one-hour one. */
+  --hour: 2.75rem;
+}
+
+/* Light mode is a real mode, not an inversion. The card stock a punch card was
+ * actually made of was buff, and the ink was near-black. */
+@media (prefers-color-scheme: light) {
+  @theme {
+    --color-ink: #f7f5f1;
+    --color-card: #ffffff;
+    --color-raise: #f1eee8;
+    --color-line: #e2ded5;
+    --color-text: #1a1a17;
+    --color-dim: #6d6960;
+    --color-faint: #9a958a;
+    --color-punch: #b8760d;
+    --color-punch-dim: #e8d3ab;
+    --color-ghost: #c9c3b6;
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark light;
+  }
+  body {
+    @apply bg-ink text-text font-sans antialiased;
+    font-size: 14px;
+  }
+  /* Keyboard focus stays visible everywhere. A tool people drive from the
+   * keyboard cannot hide where the keyboard is. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-punch;
+  }
+  ::selection {
+    background: var(--color-punch);
+    color: var(--color-ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* A commit landing after a scan should be noticed, not announced. */
+@keyframes punch-in {
+  from { opacity: 0; transform: scale(0.4); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.punch-in { animation: punch-in 240ms cubic-bezier(0.2, 0.8, 0.3, 1); }

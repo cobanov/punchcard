@@ -25,3 +25,7 @@ coverage.*
 # Swift build output (apps/menubar)
 apps/menubar/.build/
 apps/menubar/build/
+
+# Web app build inputs. The BUILT dist is committed (internal/http/webui/dist)
+# because go build and Docker run no Node stage.
+/web/node_modules/
