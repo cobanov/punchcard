@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type ProjectTotal } from "../lib/api";
-import { addDays, dayStart, money, toDateInput, total } from "../lib/format";
+import { money, total } from "../lib/format";
 
 /**
  * Analytics: what happened, and whether it is more or less than before.
@@ -23,18 +23,94 @@ interface Range {
   key: RangeKey;
 }
 
-function presetRange(key: Exclude<RangeKey, "custom">): Range {
-  const now = new Date();
-  const today = dayStart(now);
+/**
+ * How far ahead of UTC the zone is at that instant, in milliseconds.
+ *
+ * There is no API that just says this, so it is read back out of a formatted
+ * date: format the instant into the zone, reassemble those wall-clock fields
+ * as if they were UTC, and the difference is the offset.
+ */
+function zoneOffset(tz: string, at: Date): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(at)
+      .map((p) => [p.type, p.value]),
+  ) as Record<string, string>;
+  const asIfUTC = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour) % 24,
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  return asIfUTC - at.getTime();
+}
+
+/**
+ * The instant a given calendar day begins in the account's timezone.
+ *
+ * Date.UTC absorbs out-of-range days, so day 0 is last month's last day and
+ * day 32 is next month's first — the callers below lean on that instead of
+ * doing calendar arithmetic themselves.
+ *
+ * Two passes, because the offset has to be sampled somewhere and the only
+ * available guess is the wrong side of a daylight-saving change: the first
+ * pass corrects UTC midnight into roughly the right instant, the second
+ * samples the offset actually in force there.
+ */
+function zonedInstant(tz: string, y: number, m: number, d: number): Date {
+  const utc = Date.UTC(y, m - 1, d);
+  const once = utc - zoneOffset(tz, new Date(utc));
+  return new Date(utc - zoneOffset(tz, new Date(once)));
+}
+
+/** Today's calendar date in the account's zone, which is rarely the browser's. */
+function todayIn(tz: string): { y: number; m: number; d: number } {
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(new Date())
+    .split("-")
+    .map(Number);
+  return { y: y!, m: m!, d: d! };
+}
+
+/**
+ * Ranges are cut in the ACCOUNT's timezone, not the browser's.
+ *
+ * These two are the same zone often enough that using the browser's looked
+ * correct for a long time. They were not the same here: the account cut its
+ * days in UTC while the browser sat three hours ahead, so "the last 7 days"
+ * began at 21:00 on the eighth day back — and both the server's grouping and
+ * the chart dutifully reported eight days for a seven-day preset.
+ *
+ * A range and the days inside it have to be cut by the same clock.
+ */
+function presetRange(key: Exclude<RangeKey, "custom">, tz: string): Range {
+  const { y, m, d } = todayIn(tz);
+  const tomorrow = zonedInstant(tz, y, m, d + 1); // exclusive end, every preset
   switch (key) {
     case "today":
-      return { from: today, to: addDays(today, 1), key };
+      return { from: zonedInstant(tz, y, m, d), to: tomorrow, key };
     case "7d":
-      return { from: addDays(today, -6), to: addDays(today, 1), key };
+      return { from: zonedInstant(tz, y, m, d - 6), to: tomorrow, key };
     case "30d":
-      return { from: addDays(today, -29), to: addDays(today, 1), key };
+      return { from: zonedInstant(tz, y, m, d - 29), to: tomorrow, key };
     case "month":
-      return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: addDays(today, 1), key };
+      return { from: zonedInstant(tz, y, m, 1), to: tomorrow, key };
   }
 }
 
@@ -46,10 +122,17 @@ interface Data {
   fetchedAt: Date;
 }
 
-export function Analytics() {
-  const [range, setRange] = useState<Range>(() => presetRange("7d"));
+export function Analytics({ timezone }: { timezone: string }) {
+  const [range, setRange] = useState<Range>(() => presetRange("7d", timezone));
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // The account loads after the first paint, so the opening range is cut in a
+  // placeholder zone. Re-cut it when the real one arrives — but never a custom
+  // range, where the dates are the user's own choice and not ours to move.
+  useEffect(() => {
+    setRange((r) => (r.key === "custom" ? r : presetRange(r.key, timezone)));
+  }, [timezone]);
 
   const load = useCallback(async (r: Range) => {
     setData(null);
@@ -83,7 +166,7 @@ export function Analytics() {
 
   return (
     <div className="space-y-4">
-      <RangePicker range={range} onChange={setRange} />
+      <RangePicker timezone={timezone} range={range} onChange={setRange} />
 
       {error && (
         <p className="rounded-md border-l-2 border-punch bg-card px-3 py-2 text-dim">{error}</p>
@@ -346,7 +429,15 @@ function Breakdown({
  * entry and shows the OS calendar, which is both more familiar and less code
  * than a picker of our own.
  */
-function RangePicker({ range, onChange }: { range: Range; onChange: (r: Range) => void }) {
+function RangePicker({
+  range,
+  onChange,
+  timezone,
+}: {
+  range: Range;
+  onChange: (r: Range) => void;
+  timezone: string;
+}) {
   const [custom, setCustom] = useState(range.key === "custom");
 
   const presets: { key: Exclude<RangeKey, "custom">; label: string }[] = [
@@ -364,7 +455,7 @@ function RangePicker({ range, onChange }: { range: Range; onChange: (r: Range) =
             key={p.key}
             onClick={() => {
               setCustom(false);
-              onChange(presetRange(p.key));
+              onChange(presetRange(p.key, timezone));
             }}
             aria-pressed={range.key === p.key}
             className={
@@ -393,28 +484,31 @@ function RangePicker({ range, onChange }: { range: Range; onChange: (r: Range) =
         <div className="flex items-center gap-1.5">
           <input
             type="date"
-            value={toDateInput(range.from)}
-            max={toDateInput(new Date())}
+            value={dayKey(range.from, timezone)}
+            max={dayKey(new Date(), timezone)}
             aria-label="From"
             onChange={(e) =>
               e.target.value &&
-              onChange({ ...range, from: new Date(`${e.target.value}T00:00:00`), key: "custom" })
+              onChange({ ...range, from: typedDay(e.target.value, timezone, 0), key: "custom" })
             }
             className="field py-1 font-mono t-caption"
           />
           <span className="text-faint">→</span>
           <input
             type="date"
-            value={toDateInput(addDays(range.to, -1))}
-            max={toDateInput(new Date())}
+            // range.to is the exclusive next midnight; one millisecond back is
+            // the last day the range actually contains.
+            value={dayKey(new Date(range.to.getTime() - 1), timezone)}
+            max={dayKey(new Date(), timezone)}
             aria-label="To"
             onChange={(e) =>
               e.target.value &&
               onChange({
                 ...range,
                 // The input names an inclusive last day; the API wants an
-                // exclusive bound, so the range ends at the next midnight.
-                to: addDays(new Date(`${e.target.value}T00:00:00`), 1),
+                // exclusive bound, so the range ends at the next midnight — in
+                // the account's zone, like every other boundary here.
+                to: typedDay(e.target.value, timezone, 1),
                 key: "custom",
               })
             }
@@ -444,6 +538,28 @@ function Skeleton() {
       </div>
     </div>
   );
+}
+
+/**
+ * The account's calendar day containing an instant, as YYYY-MM-DD.
+ *
+ * The date inputs show and accept days, and a day only means something once
+ * you say whose clock drew it. Formatting these in the browser's zone put the
+ * boundary an hour or three away from where the report actually cut it.
+ */
+function dayKey(at: Date, tz: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(at);
+}
+
+/** A YYYY-MM-DD from a date input, read as a day in the account's zone. */
+function typedDay(value: string, tz: string, plusDays: number): Date {
+  const [y, m, d] = value.split("-").map(Number);
+  return zonedInstant(tz, y!, m!, d! + plusDays);
 }
 
 /**

@@ -239,7 +239,7 @@ export function App() {
         </>
       )}
 
-      {view === "analytics" && <Analytics />}
+      {view === "analytics" && <Analytics timezone={account?.timezone ?? "UTC"} />}
       {view === "projects" && <Projects projects={projects} onChange={load} />}
       {view === "settings" && account && (
         <Settings account={account} github={github} onSaved={load} />
