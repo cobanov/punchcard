@@ -1,6 +1,8 @@
 # punchcard — tasarım belgesi
 
 Tarih: 2026-08-25 · Durum: onaylandı, uygulamaya hazır
+Revizyon: 2026-08-25 — v1 **yalnızca backend**. Web arayüzü tasarım şemaları
+geldikten sonra ayrı bir spec ile, stack o zaman seçilecek.
 
 ## 1. Ne yapıyoruz
 
@@ -13,32 +15,40 @@ Kimai/Solidtime gibi mevcut açık kaynak ürünlerde zaten var; commit eşlemes
 yok. Tasarımın tamamı bu özelliğin etrafında kurulur.
 
 Ürün üyelik tabanlıdır: veri sunucuda durur, aynı hesap birden fazla istemciden
-(v1'de web) erişilir ve senkron kalır.
+erişilir ve senkron kalır. v1 bu sözleşmenin sunucu tarafını teslim eder.
 
 ## 2. Kapsam
 
-### v1 içinde
+### v1 içinde — yalnızca backend
+
+v1'in teslim ettiği şey çalışan, belgelenmiş, canlıda duran bir API'dir. Arayüz
+yoktur; tarayıcıdan görülen tek şey OpenAPI dokümantasyonudur.
 
 - Üyelik: e-posta, GitHub/Google/Apple ile giriş, TOTP 2FA, API token'ları
 - Projeler: ad, müşteri, renk, saatlik ücret, para birimi, faturalanabilirlik, arşiv
 - Projeye GitHub reposu bağlama (çoğa çok)
-- Canlı timer: başlat / durdur, sunucu tarafında tek doğruluk kaynağı
-- Kayıtları elle düzeltme: başlangıç–bitiş saati değiştirme, silme, bölme
-- Raporlar: tarih aralığı, proje kırılımı, süre ve tutar, gün gün grafik, CSV
+- Timer: başlat / durdur, sunucu tarafında tek doğruluk kaynağı
+- Kayıt düzeltme uçları: saat değiştirme, silme, bölme
+- Raporlar: tarih aralığı, proje kırılımı, süre ve tutar, CSV
 - GitHub commit eşleme + geç push'lar için geriye dönük tarama
-- Eşleşmemiş commit'lerden tek tıkla kayıt oluşturma
-- SSE ile cihazlar arası anlık senkronizasyon
-- Docker compose ile tek komut self-host
+- Eşleşmemiş commit öbeklerinden kayıt oluşturma ucu
+- SSE olay akışı (istemciler v2'de tüketecek)
+- OpenAPI şeması ve dokümantasyon sayfası
+- Docker compose ile tek komut self-host, canlıda `punchcard.cobanov.run`
 
 ### v1 dışında
 
 Her biri kendi spec'ini alacak:
 
-1. Chrome eklentisi, CLI, mobil istemciler (API v1'de hazır olacak)
-2. Fatura kesme, tahsilat takibi, ödeme durumu
-3. Takım ve paylaşım — altyapı taşınır, arayüzde açılmaz
-4. Boşta kalma tespiti (klavye/fare hareketsizliğinden otomatik kesme)
-5. GitLab, Bitbucket, self-hosted git sağlayıcıları
+1. **Web arayüzü** — tasarım şemaları geldikten sonra, stack o zaman seçilecek
+2. CLI, Chrome eklentisi, mobil istemciler
+3. Fatura kesme, tahsilat takibi, ödeme durumu
+4. Takım ve paylaşım — altyapı taşınır, uçlar açılmaz
+5. Boşta kalma tespiti, GitLab/Bitbucket sağlayıcıları
+
+Backend'i önce bitirmenin bedeli şu: v1 sonunda ürün `curl` ve OpenAPI sayfası
+üzerinden kullanılabilir olacak, günlük kullanıma değil. Buna karşılık arayüz
+geldiğinde altında oturmuş, test edilmiş ve canlıda çalışmış bir API bulacak.
 
 ## 3. Mimari
 
@@ -49,8 +59,8 @@ iskeletinden türetilir. helva üretimde çalışan, API-first bir Go servisidir
 `internal/` ağacının yaklaşık yarısı domain'den bağımsızdır.
 
 Yığın: Go 1.26 · huma/v2 (OpenAPI) · chi · pgx/v5 · goose (migration) ·
-Postgres · React + Vite + Tailwind + radix-ui · testcontainers · Playwright.
-Lisans MIT, helva ile aynı.
+Postgres · testcontainers. Lisans MIT, helva ile aynı. İstemci tarafı yığını
+(React/Tauri/eklenti) v1'e taşınmaz; arayüz spec'inde yeniden seçilecek.
 
 ### 3.2 Neredeyse olduğu gibi taşınan
 
@@ -70,13 +80,18 @@ Lisans MIT, helva ile aynı.
 - `internal/http` handler'ları: `list_handlers.go` / `task_handlers.go` yerine
   `project_handlers.go` / `session_handlers.go` / `report_handlers.go` /
   `github_handlers.go`
-- `web/src`: tüm ekranlar
 
 ### 3.4 Atılan
 
-Sürükle-bırak (`dnd.ts`), sıralama (`position`), Gemini sohbeti
-(`internal/gemini`, `chat_handler.go`), offline yazma kuyruğu (v1'de okuma
-önbelleği yeterli, yazmalar çevrimiçi).
+Tüm `web/` ağacı (React uygulaması, Tauri paketi, Chrome eklentisi, Playwright
+paketi) v1'e taşınmaz. Sürükle-bırak (`dnd.ts`), sıralama (`position` ve
+`position-parity` kontrolü), Gemini sohbeti (`internal/gemini`,
+`chat_handler.go`), offline senkron katmanı (`00009_offline_sync.sql`) de
+taşınmaz.
+
+Bunun bir yan etkisi var ve bilinçlidir: helva'nın `go:embed`'lenmiş dist'i ve
+onunla gelen tüm tuzaklar (yanlış bundle'ın servis edilmesi, `make web` sırası)
+punchcard v1'de **yoktur**. Arayüz spec'i geldiğinde bu karar yeniden verilecek.
 
 ### 3.5 İsim çakışması
 
@@ -286,7 +301,12 @@ GET /v1/events                    -- SSE; session.started, session.stopped,
                                      session.updated, commits.attached
 ```
 
-## 6. Arayüz
+## 6. Hedeflenen arayüz — v1'de yazılmıyor
+
+Bu bölüm v1'in teslimatı değildir. Buradaki akış, 5. bölümdeki API'nin **neyi
+karşılamak zorunda olduğunu** belirlediği için spec'te tutulur: her uç, aşağıdaki
+ekranların tek bir istekle çizilebilmesini sağlayacak şekilde tasarlanmıştır.
+Gerçek arayüz spec'i tasarım şemaları geldiğinde yazılacak.
 
 Tek sayfa uygulaması, dört sekme: **Bugün · Raporlar · Projeler · Ayarlar**.
 
@@ -442,14 +462,26 @@ Kullanıcı onaylar, `source='auto'` ile kayıt oluşur ve commit'ler bağlanır
   bağlanmıyor mu, token iptali doğru raporlanıyor mu.
 - **Veritabanı kuralları:** açık oturum tekilliği ve `UNIQUE (commit_id)` doğrudan
   test edilir — bunlar uygulama katmanına bırakılmayan garantilerdir.
-- **Tarayıcı:** Playwright ile başlat–durdur–düzelt akışı, rapor toplamları,
-  eşleşmemiş commit'ten kayıt oluşturma.
+- **Uçtan uca (tarayıcısız):** başlat–durdur–düzelt–raporla akışı HTTP
+  seviyesinde, gerçek Postgres'e karşı koşan bir senaryo testiyle sınanır.
+  Tarayıcı testi v1'de yoktur, arayüz olmadığı için.
 - **Zaman dilimi:** rapor gün sınırları en az iki farklı zaman diliminde sınanır.
+- **Kapı:** `make check` — `go vet` · `golangci-lint` · `gosec` · `govulncheck` ·
+  `openapi-check` · `go test -race ./...`. helva'daki tuzak aynen geçerlidir:
+  `DOCKER_HOST` dışa aktarılmazsa entegrasyon testleri **atlanır** ve koşu hiçbir
+  şey test etmemiş halde yeşil görünür. Bu Mac'te (OrbStack):
+  `export DOCKER_HOST=unix:///Users/cobanov/.orbstack/run/docker.sock`
 
 ## 10. Dağıtım
 
-helva'nın `deploy/` düzeni taşınır: tek Go binary (web derlemesi gömülü) +
-Postgres, docker compose ile ayağa kalkar.
+helva'nın `deploy/` düzeni taşınır: tek Go binary + Postgres, docker compose ile
+ayağa kalkar. v1'de gömülü web derlemesi yoktur, dolayısıyla `make web` adımı ve
+"eski bundle servis edildi" tuzağı da yoktur.
+
+Canlı ortam helva ile aynı yerdedir: homelab'de **ct104** (`ct104-apps` root
+alias), `/opt/` altında kendi dizini, `docker-compose.homelab.yml`, önünde Caddy
++ Cloudflare Tunnel. Deploy `git archive HEAD` ile gönderilir, GitHub Actions
+kullanılmaz.
 
 ```bash
 cp deploy/.env.example deploy/.env    # POSTGRES_PASSWORD, DOMAIN,
@@ -464,8 +496,8 @@ Barındırılan örnek: `punchcard.cobanov.run`. Lisans MIT.
 
 Sırayla, her biri ayrı tasarım–plan–uygulama döngüsü:
 
-1. CLI istemcisi (`punchcard start`, `stop`, `status`) — API token ile
-2. Chrome eklentisi ve Tauri masaüstü/mobil paketi
-3. Faturalandırma: fatura kesme, tahsilat durumu, müşteriye rapor gönderme
-4. Takım: proje paylaşımı, üye rolleri, ekip raporları
-5. GitLab ve diğer sağlayıcılar
+1. Web arayüzü — tasarım şemalarından, stack o aşamada seçilecek
+2. CLI istemcisi (`punchcard start`, `stop`, `status`) — API token ile
+3. Chrome eklentisi ve masaüstü/mobil paket
+4. Faturalandırma: fatura kesme, tahsilat durumu, müşteriye rapor gönderme
+5. Takım: proje paylaşımı, üye rolleri, ekip raporları
