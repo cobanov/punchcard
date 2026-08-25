@@ -494,6 +494,38 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 	return i, err
 }
 
+const updateUserTimezone = `-- name: UpdateUserTimezone :one
+UPDATE users SET timezone = $2, updated_at = now() WHERE id = $1 RETURNING id, email, password_hash, email_verified_at, display_name, avatar_url, timezone, google_sub, github_id, apple_sub, totp_secret_enc, totp_enabled, created_at, updated_at, deleted_at
+`
+
+type UpdateUserTimezoneParams struct {
+	ID       uuid.UUID `json:"id"`
+	Timezone string    `json:"timezone"`
+}
+
+func (q *Queries) UpdateUserTimezone(ctx context.Context, arg UpdateUserTimezoneParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserTimezone, arg.ID, arg.Timezone)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.EmailVerifiedAt,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.Timezone,
+		&i.GoogleSub,
+		&i.GithubID,
+		&i.AppleSub,
+		&i.TotpSecretEnc,
+		&i.TotpEnabled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const useRecoveryCode = `-- name: UseRecoveryCode :execrows
 UPDATE two_factor_recovery_codes SET used_at = now()
 WHERE user_id = $1 AND code_hash = $2 AND used_at IS NULL

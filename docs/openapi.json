@@ -786,6 +786,11 @@
             "maxLength": 200,
             "minLength": 8,
             "type": "string"
+          },
+          "timezone": {
+            "description": "IANA name, e.g. Europe/Istanbul. Report days are cut in this zone.",
+            "maxLength": 64,
+            "type": "string"
           }
         },
         "type": "object"
@@ -1745,6 +1750,10 @@
           "id": {
             "type": "string"
           },
+          "timezone": {
+            "description": "IANA name. Report days are cut in this zone.",
+            "type": "string"
+          },
           "two_factor_enabled": {
             "type": "boolean"
           }
@@ -1753,6 +1762,7 @@
           "id",
           "email",
           "display_name",
+          "timezone",
           "email_verified",
           "two_factor_enabled",
           "created_at"

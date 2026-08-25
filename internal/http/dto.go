@@ -14,6 +14,7 @@ type UserDTO struct {
 	Email            string    `json:"email"`
 	DisplayName      string    `json:"display_name"`
 	AvatarURL        string    `json:"avatar_url,omitempty"`
+	Timezone         string    `json:"timezone" doc:"IANA name. Report days are cut in this zone."`
 	EmailVerified    bool      `json:"email_verified"`
 	TwoFactorEnabled bool      `json:"two_factor_enabled"`
 	CreatedAt        time.Time `json:"created_at"`
@@ -33,6 +34,7 @@ func userDTO(u db.User) UserDTO {
 		Email:            u.Email,
 		DisplayName:      name,
 		AvatarURL:        avatar,
+		Timezone:         u.Timezone,
 		EmailVerified:    u.EmailVerifiedAt != nil,
 		TwoFactorEnabled: u.TotpEnabled,
 		CreatedAt:        u.CreatedAt,

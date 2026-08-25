@@ -81,3 +81,57 @@ func TestUnpricedProjectSerializesRateAsNull(t *testing.T) {
 		t.Fatalf("hourly_rate_cents = %v, want null", *out.HourlyRateCents)
 	}
 }
+
+// The timezone drives every report's day boundaries, so it has to be reachable
+// from a client. It was not: the column existed and nothing could read or write
+// it, which left every account on UTC and every report cutting days in the
+// wrong place for anyone outside Greenwich.
+func TestTimezoneRoundTripsThroughTheAccount(t *testing.T) {
+	srv, _ := newAuthTestServer(t)
+	base := srv.URL
+	csrf := testCSRF()
+	c, _ := registerActor(t, base, "tz@example.com")
+
+	_, body := do(t, c, http.MethodGet, base+"/v1/me", nil, nil)
+	var me struct {
+		Timezone string `json:"timezone"`
+	}
+	unmarshal(t, body, &me)
+	if me.Timezone != "UTC" {
+		t.Fatalf("a new account starts at %q, want UTC", me.Timezone)
+	}
+
+	must(t, "set timezone", st(t, c, http.MethodPatch, base+"/v1/me",
+		map[string]any{"timezone": "Europe/Istanbul"}, csrf), http.StatusOK)
+
+	_, body = do(t, c, http.MethodGet, base+"/v1/me", nil, nil)
+	unmarshal(t, body, &me)
+	if me.Timezone != "Europe/Istanbul" {
+		t.Fatalf("timezone = %q after setting it", me.Timezone)
+	}
+
+	// And the reports have to actually use it, or the setting is decoration.
+	_, body = do(t, c, http.MethodGet, base+"/v1/reports/summary", nil, nil)
+	var summary struct {
+		Timezone string `json:"timezone"`
+	}
+	unmarshal(t, body, &summary)
+	if summary.Timezone != "Europe/Istanbul" {
+		t.Fatalf("reports still bucket in %q", summary.Timezone)
+	}
+}
+
+// A zone this server cannot load must be refused, not accepted and silently
+// resolved to UTC at read time — the user would never learn why their days
+// looked wrong.
+func TestUnknownTimezoneIsRefused(t *testing.T) {
+	srv, _ := newAuthTestServer(t)
+	base := srv.URL
+	c, _ := registerActor(t, base, "badtz@example.com")
+
+	code := st(t, c, http.MethodPatch, base+"/v1/me",
+		map[string]any{"timezone": "Mars/Olympus_Mons"}, testCSRF())
+	if code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422", code)
+	}
+}

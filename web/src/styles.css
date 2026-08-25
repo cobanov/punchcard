@@ -36,6 +36,34 @@
 
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Type scale: 1.2 from a 13px body, rounded to whole pixels.
+   *
+   * Deliberately shallow. A tool read at a glance needs three or four steps,
+   * not eight — a wide scale invites headings that shout at rows nobody is
+   * reading yet. Styles are named for role below; these are the raw steps. */
+  --text-caption: 0.6875rem;  /* 11px — labels, meta, keyboard hints */
+  --text-body: 0.8125rem;     /* 13px — the default */
+  --text-lead: 0.9375rem;     /* 15px — the timer input, one step up */
+  --text-title: 1.125rem;     /* 18px — screen titles */
+  --text-metric: 1.5rem;      /* 24px — headline numbers */
+  --text-clock: 1.375rem;     /* 22px — the running clock */
+
+  /* Spacing: base-4, the subset actually used. Anything not here is a decision
+   * nobody made. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+
+  /* Breakpoints named for viewport behaviour, not hardware — "phone" ages
+   * badly, "narrow" does not. */
+  --breakpoint-narrow: 30rem;
+  --breakpoint-mid: 48rem;
+  --breakpoint-wide: 64rem;
 }
 
 @layer base {
@@ -45,8 +73,11 @@
 
   body {
     @apply bg-ink text-text font-sans antialiased;
-    /* 13px: the density of a tool that shares a screen with an editor. */
-    font-size: 13px;
+    /* 13px: the density of a tool that shares a screen with an editor. In rem
+     * so browser zoom and OS text-size settings scale it — a px body ignores
+     * both, which is the usual way a dense interface becomes unreadable at
+     * 200%. */
+    font-size: var(--text-body);
     line-height: 1.5;
   }
 
@@ -89,9 +120,50 @@
            focus:border-line-strong;
   }
 
+  /* Semantic text styles.
+   *
+   * Named for role, never for size: a component asking for `.t-caption` keeps
+   * meaning what it meant when the scale moves, whereas one asking for
+   * `text-[11px]` has to be found and edited. Line height and tracking are part
+   * of the style, because a heading and a paragraph at the same size still need
+   * different ones. */
+  .t-metric {
+    font-size: var(--text-metric);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+  .t-clock {
+    font-family: var(--font-mono);
+    font-size: var(--text-clock);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .t-title {
+    font-size: var(--text-title);
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+    font-weight: 600;
+  }
+  .t-lead {
+    font-size: var(--text-lead);
+    line-height: 1.4;
+  }
+  .t-body {
+    font-size: var(--text-body);
+    line-height: 1.5;
+  }
+  .t-caption {
+    font-size: var(--text-caption);
+    line-height: 1.45;
+  }
   /* Section labels name a region without competing with what is in it. */
   .eyebrow {
-    @apply text-[11px] font-medium uppercase tracking-[0.08em] text-faint;
+    font-size: var(--text-caption);
+    line-height: 1.45;
+    @apply font-medium uppercase tracking-[0.08em] text-faint;
   }
 
   /* The one card shape. Flat — hierarchy comes from the border, not a shadow. */

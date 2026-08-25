@@ -3,28 +3,26 @@ import {
   api,
   NotSignedIn,
   signInURL,
+  type Account,
   type Cluster,
   type Commit,
   type GitHubStatus,
   type Project,
-  type ProjectTotal,
   type Session,
 } from "./lib/api";
-import {
-  addDays,
-  dayName,
-  daysAgo,
-  isToday,
-  money,
-  startOfToday,
-  toDateInput,
-  total,
-} from "./lib/format";
+import { addDays, dayName, daysAgo, isToday, startOfToday, toDateInput, total } from "./lib/format";
 import { SessionList, UnmatchedList } from "./components/SessionList";
 import { Projects } from "./components/Projects";
 import { TimerBar } from "./components/TimerBar";
+import { Analytics } from "./components/Analytics";
+import { Settings } from "./components/Settings";
+import { UserMenu } from "./components/UserMenu";
 
-type View = "today" | "projects" | "reports";
+/** Tab order is by how often each is opened, not alphabetically: Today is
+ *  every visit, Analytics is weekly, Projects is setup. Settings is not a tab —
+ *  it lives in the account menu, because it is not a place you work. */
+const TABS = ["today", "analytics", "projects"] as const;
+type View = (typeof TABS)[number] | "settings";
 
 export function App() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -38,6 +36,7 @@ export function App() {
   const [commits, setCommits] = useState<Record<string, Commit[]>>({});
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [github, setGithub] = useState<GitHubStatus | null>(null);
+  const [account, setAccount] = useState<Account | null>(null);
   const [weekSeconds, setWeekSeconds] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,7 +48,8 @@ export function App() {
 
   const load = useCallback(async () => {
     try {
-      const [loadedProjects, loadedCurrent, loadedSessions, loadedGithub] = await Promise.all([
+      const [loadedProjects, loadedCurrent, loadedSessions, loadedGithub, loadedAccount] =
+        await Promise.all([
         api.projects(),
         // The running timer is fetched on its own, not derived from the day's
         // sessions — browsing yesterday must not make a running timer vanish
@@ -57,12 +57,14 @@ export function App() {
         api.current(),
         api.sessions(day, addDays(day, 1)),
         api.github(),
+        api.me(),
       ]);
       setSignedIn(true);
       setProjects(loadedProjects);
       setCurrent(loadedCurrent);
       setSessions(loadedSessions);
       setGithub(loadedGithub);
+      setAccount(loadedAccount);
       setError(null);
 
       // The week number in the stats strip. Fetched with the page rather than
@@ -144,13 +146,17 @@ export function App() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 pb-20 pt-6">
-      <header className="mb-5 flex items-center gap-4">
-        <span className="font-semibold tracking-tight">punchcard</span>
-        <nav
-          className="flex gap-0.5 rounded-lg border border-line bg-card p-0.5"
-          aria-label="Views"
+      {/* One row, three groups, aligned on a single centre line. The wordmark
+          and the tabs share a baseline; the account sits at the far end. */}
+      <header className="mb-5 flex h-8 items-center gap-4">
+        <button
+          onClick={() => setView("today")}
+          className="shrink-0 font-semibold tracking-tight"
         >
-          {(["today", "projects", "reports"] as const).map((v) => (
+          punchcard
+        </button>
+        <nav className="flex gap-0.5 rounded-lg border border-line bg-card p-0.5" aria-label="Views">
+          {TABS.map((v) => (
             <button
               key={v}
               onClick={() => setView(v)}
@@ -158,16 +164,24 @@ export function App() {
               className={
                 view === v
                   ? "rounded-md bg-raise px-3 py-1 text-text"
-                  : "rounded-md px-3 py-1 text-dim transition-colors hover:text-text"
+                  : "rounded-md px-3 py-1 text-dim transition-colors hover:bg-raise/50 hover:text-text"
               }
             >
               {v[0]!.toUpperCase() + v.slice(1)}
             </button>
           ))}
         </nav>
-        <span className="ml-auto font-mono text-[11px] text-faint">
-          {github?.login ? `@${github.login}` : ""}
-        </span>
+        <div className="ml-auto">
+          <UserMenu
+            account={account}
+            onSettings={() => setView("settings")}
+            onSignOut={() =>
+              void api.logout().finally(() => {
+                window.location.href = "/";
+              })
+            }
+          />
+        </div>
       </header>
 
       {error && (
@@ -221,8 +235,11 @@ export function App() {
         </>
       )}
 
+      {view === "analytics" && <Analytics />}
       {view === "projects" && <Projects projects={projects} onChange={load} />}
-      {view === "reports" && <Reports />}
+      {view === "settings" && account && (
+        <Settings account={account} github={github} onSaved={load} />
+      )}
     </div>
   );
 }
@@ -310,96 +327,6 @@ function DayNav({ day, onChange }: { day: Date; onChange: (d: Date) => void }) {
   );
 }
 
-/** Range totals. Data is fetched here rather than upstream: the tab owns its
- *  own question, and the main screen never pays for it. */
-function Reports() {
-  const [days, setDays] = useState<7 | 30>(7);
-  const [totals, setTotals] = useState<ProjectTotal[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setTotals(null);
-    api
-      .summary(daysAgo(days), new Date())
-      .then((r) => setTotals(r.projects))
-      .catch((e) => setError((e as Error).message));
-  }, [days]);
-
-  const from = daysAgo(days).toISOString();
-
-  return (
-    <div>
-      <div className="mb-3 flex w-fit items-center gap-0.5 rounded-lg border border-line bg-card p-0.5">
-        {([7, 30] as const).map((d) => (
-          <button
-            key={d}
-            onClick={() => setDays(d)}
-            className={
-              days === d
-                ? "rounded-md bg-raise px-3 py-1 text-text"
-                : "rounded-md px-3 py-1 text-dim transition-colors hover:text-text"
-            }
-          >
-            {d} days
-          </button>
-        ))}
-      </div>
-
-      {error && (
-        <p className="mb-3 rounded-md border-l-2 border-punch bg-card px-3 py-2 text-dim">
-          {error}
-        </p>
-      )}
-
-      {totals === null ? (
-        <div className="panel space-y-2 p-3">
-          <div className="skeleton h-5 w-full" />
-          <div className="skeleton h-5 w-4/5" />
-          <div className="skeleton h-5 w-3/5" />
-        </div>
-      ) : totals.length === 0 ? (
-        <p className="panel px-3 py-6 text-center text-faint">
-          Nothing recorded in the last {days} days.
-        </p>
-      ) : (
-        <>
-          <div className="panel overflow-hidden">
-            <ul className="divide-y divide-line">
-              {totals.map((t) => (
-                <li key={t.project_id} className="flex items-baseline gap-3 px-3 py-2">
-                  <span className="w-40 shrink-0 truncate font-medium">{t.name}</span>
-                  <span className="min-w-0 flex-1 truncate text-dim">{t.client}</span>
-                  <span className="tnum w-16 shrink-0 text-right font-mono text-[12px] text-dim">
-                    {total(t.seconds)}
-                  </span>
-                  <span className="tnum w-28 shrink-0 text-right font-mono text-[12px]">
-                    {t.amount_cents == null ? (
-                      <span className="text-faint">—</span>
-                    ) : (
-                      money(t.amount_cents, t.currency)
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="mt-2 flex items-baseline justify-between px-1 text-dim">
-            <a
-              href={`/v1/reports/export.csv?from=${encodeURIComponent(from)}`}
-              className="text-[12px] text-faint transition-colors hover:text-punch"
-            >
-              Download CSV
-            </a>
-            <span className="tnum font-mono text-[12px]">
-              {total(totals.reduce((sum, t) => sum + t.seconds, 0))}
-            </span>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 function GitHubNote({ status }: { status: GitHubStatus | null }) {
   if (!status) return null;
   if (!status.connected) {
@@ -427,9 +354,10 @@ function GitHubNote({ status }: { status: GitHubStatus | null }) {
 function LoadingScreen() {
   return (
     <div className="mx-auto max-w-2xl px-4 pt-6">
-      <div className="mb-5 flex items-center gap-4">
-        <span className="font-semibold tracking-tight">punchcard</span>
-        <div className="skeleton h-7 w-56" />
+      <div className="mb-5 flex h-8 items-center gap-4">
+        <span className="shrink-0 font-semibold tracking-tight">punchcard</span>
+        <div className="skeleton h-7 w-52" />
+        <div className="skeleton ml-auto h-6 w-6 rounded-full" />
       </div>
       <div className="skeleton h-12 w-full" />
       <div className="mt-3 space-y-1">

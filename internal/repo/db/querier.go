@@ -173,6 +173,7 @@ type Querier interface {
 	UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) (User, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
+	UpdateUserTimezone(ctx context.Context, arg UpdateUserTimezoneParams) (User, error)
 	UpdateWebhook(ctx context.Context, arg UpdateWebhookParams) (Webhook, error)
 	UpdateWorkSession(ctx context.Context, arg UpdateWorkSessionParams) (WorkSession, error)
 	// Commits ------------------------------------------------------------------

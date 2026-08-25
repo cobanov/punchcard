@@ -48,6 +48,7 @@ func (d Deps) registerMeRoutes(api huma.API) {
 			Email           *string `json:"email,omitempty" format:"email" doc:"New email (re-triggers verification)."`
 			DisplayName     *string `json:"display_name,omitempty" maxLength:"100" doc:"Display name shown in the UI."`
 			AvatarURL       *string `json:"avatar_url,omitempty" maxLength:"700000" doc:"Profile photo as a data:image/... URL, or empty string to clear."`
+			Timezone        *string `json:"timezone,omitempty" maxLength:"64" doc:"IANA name, e.g. Europe/Istanbul. Report days are cut in this zone."`
 			CurrentPassword *string `json:"current_password,omitempty" doc:"Required when changing password."`
 			NewPassword     *string `json:"new_password,omitempty" minLength:"8" maxLength:"200"`
 		}
@@ -58,6 +59,11 @@ func (d Deps) registerMeRoutes(api huma.API) {
 		}
 		if in.Body.DisplayName != nil {
 			if _, err := d.Auth.UpdateProfile(ctx, p, *in.Body.DisplayName, clientIP(ctx)); err != nil {
+				return nil, d.problem(ctx, err)
+			}
+		}
+		if in.Body.Timezone != nil {
+			if _, err := d.Auth.UpdateTimezone(ctx, p, *in.Body.Timezone, clientIP(ctx)); err != nil {
 				return nil, d.problem(ctx, err)
 			}
 		}

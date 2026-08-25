@@ -519,6 +519,37 @@ func (a *Auth) ChangePassword(ctx context.Context, p *auth.Principal, current, n
 	return nil
 }
 
+// UpdateTimezone sets the account's reporting timezone. Session-only.
+//
+// This is not cosmetic. Every report buckets days with
+// `date_trunc('day', started_at AT TIME ZONE $tz)`, so until a user can set
+// this, a session from 22:30 to 23:30 UTC lands on the wrong local day for
+// everyone outside Greenwich — and the column existed, unreachable, doing
+// exactly that.
+//
+// The zone is validated against the tzdata the server actually has, rather than
+// pattern-matched: a name this process cannot load would silently fall back to
+// UTC at read time and the user would never learn why their days looked wrong.
+func (a *Auth) UpdateTimezone(ctx context.Context, p *auth.Principal, tz, ip string) (db.User, error) {
+	if !p.FirstParty() {
+		return db.User{}, ErrSessionOnly
+	}
+	tz = strings.TrimSpace(tz)
+	if tz == "" {
+		tz = "UTC"
+	}
+	if _, err := time.LoadLocation(tz); err != nil {
+		return db.User{}, NewError(422, "validation_failed",
+			"unknown timezone: "+tz+" (use an IANA name such as Europe/Istanbul)")
+	}
+	u, err := a.store.UpdateUserTimezone(ctx, db.UpdateUserTimezoneParams{ID: p.UserID, Timezone: tz})
+	if err != nil {
+		return db.User{}, fmt.Errorf("update timezone: %w", err)
+	}
+	a.audit.Record(ctx, &p.UserID, "profile.change", ip, map[string]any{"timezone": tz})
+	return u, nil
+}
+
 // UpdateProfile sets the account display name. Session-only.
 func (a *Auth) UpdateProfile(ctx context.Context, p *auth.Principal, displayName, ip string) (db.User, error) {
 	if !p.FirstParty() {

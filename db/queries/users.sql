@@ -91,3 +91,6 @@ UPDATE users SET deleted_at = now(), updated_at = now() WHERE id = $1;
 
 -- name: HardDeleteUser :exec
 DELETE FROM users WHERE id = $1;
+
+-- name: UpdateUserTimezone :one
+UPDATE users SET timezone = $2, updated_at = now() WHERE id = $1 RETURNING *;
