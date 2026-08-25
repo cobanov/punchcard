@@ -59,6 +59,28 @@ const LANDMARKS = [0, 6, 12, 18, 24];
  *  into a chart nobody asked for. */
 const MAX_LANES = 3;
 
+/**
+ * The two bands' proportions, in one place, because they encode a hierarchy.
+ *
+ * A declared session is the record; a reported run is evidence for it. So
+ * sessions stay tall and fully saturated and runs stay shorter and dimmer — but
+ * a three-pixel bar is below the height at which a rounded rectangle reads as a
+ * bar at all, and at that size thirty-five of them in one neutral grey are
+ * indistinguishable from each other and nearly from the background. Six pixels
+ * is the floor for something meant to be seen; the hierarchy is carried by
+ * opacity and by the twenty-two pixels the sessions still have on them.
+ */
+const SESSION_TOP = 4;
+const SESSION_HEIGHT = 28;
+const RUN_TOP = 38;
+const RUN_HEIGHT = 6;
+const RUN_GAP = 3;
+const RUN_OPACITY = 0.55;
+
+/** The narrowest a stretch may be drawn. Two pixels is a speck; four is a mark
+ *  you can see and put a pointer on. */
+const MIN_RUN_WIDTH = 0.45;
+
 type Span = { from: number; end: number };
 
 /**
@@ -196,13 +218,26 @@ export function DayTimeline({
     .filter((b) => b.end >= b.from);
 
   const runSpans = packLanes(mergeRuns(runs));
+  // Repositories get their own colours, from the same palette the projects use.
+  // Neutral grey was the honest choice when a run had to look unlike a session,
+  // but it made thirty-five stretches look like one texture; the distinction is
+  // carried by height and opacity instead, which say "secondary" without saying
+  // "identical to each other".
+  const runColours = assignColors([...new Set(runSpans.map((r) => r.key))].map((id) => ({ id })));
   const laneCount = Math.min(Math.max(...runSpans.map((s) => s.lane + 1), 1), MAX_LANES);
 
   if (!blocks.length && !runSpans.length) return null;
 
   return (
     <div className="border-b border-line px-3 py-2.5">
-      <div className="relative overflow-hidden rounded-md bg-ink" style={{ height: 36 + (runSpans.length ? 6 + laneCount * 5 : 0) }}>
+      <div
+        className="relative overflow-hidden rounded-md bg-ink"
+        style={{
+          height: runSpans.length
+            ? RUN_TOP + laneCount * (RUN_HEIGHT + RUN_GAP) - RUN_GAP + SESSION_TOP
+            : SESSION_TOP + SESSION_HEIGHT + SESSION_TOP,
+        }}
+      >
         {NIGHT.map(([from, to]) => (
           <span
             key={from}
@@ -231,8 +266,8 @@ export function DayTimeline({
               // A two-minute session is still a fact about the day. Give every
               // block a floor so it cannot round away to nothing.
               width: `${Math.max(pct(b.end - b.from), 0.35)}%`,
-              top: 4,
-              height: 28,
+              top: SESSION_TOP,
+              height: SESSION_HEIGHT,
               animationDelay: `${Math.min(i * 40, 240)}ms`,
               // Running time is amber, everywhere in this app. A finished
               // stretch wears its project's colour.
@@ -260,12 +295,14 @@ export function DayTimeline({
         {runSpans.map((b, i) => (
           <span
             key={`${b.key}-${b.from}-${i}`}
-            className="bar-rise absolute rounded-[2px] bg-dim/45"
+            className="bar-rise absolute rounded-[2px]"
             style={{
               left: `${pct(b.from)}%`,
-              width: `${Math.max(pct(b.end - b.from), 0.25)}%`,
-              top: 38 + b.lane * 5,
-              height: 3,
+              width: `${Math.max(pct(b.end - b.from), MIN_RUN_WIDTH)}%`,
+              top: RUN_TOP + b.lane * (RUN_HEIGHT + RUN_GAP),
+              height: RUN_HEIGHT,
+              background: runColours.get(b.key),
+              opacity: RUN_OPACITY,
               animationDelay: `${Math.min(240 + i * 8, 400)}ms`,
             }}
             onMouseEnter={() =>
@@ -279,7 +316,7 @@ export function DayTimeline({
                   // it. Parallel turns make the second larger than the first,
                   // and hiding that would be the misleading choice.
                   sub: `${clock(b.from)}–${clock(b.end)} · ${total(b.seconds)} over ${b.turns} turn${b.turns === 1 ? "" : "s"}`,
-                  colour: "var(--color-dim)",
+                  colour: runColours.get(b.key) ?? "var(--color-dim)",
                 },
               })
             }
