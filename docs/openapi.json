@@ -1031,6 +1031,10 @@
           "client": {
             "type": "string"
           },
+          "color": {
+            "description": "Palette name, not a hex value. Empty when the project has no colour set.",
+            "type": "string"
+          },
           "currency": {
             "type": "string"
           },

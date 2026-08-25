@@ -563,6 +563,7 @@ SELECT
     p.id            AS project_id,
     p.name          AS project_name,
     p.client        AS client,
+    p.color         AS color,
     p.currency      AS currency,
     p.billable      AS billable,
     p.hourly_rate_cents AS hourly_rate_cents,
@@ -577,7 +578,7 @@ WHERE ws.user_id = $3
   AND ws.ended_at IS NOT NULL
   AND ws.started_at < $1::timestamptz
   AND ws.ended_at > $2::timestamptz
-GROUP BY p.id, p.name, p.client, p.currency, p.billable, p.hourly_rate_cents
+GROUP BY p.id, p.name, p.client, p.color, p.currency, p.billable, p.hourly_rate_cents
 ORDER BY seconds DESC
 `
 
@@ -591,6 +592,7 @@ type SummaryByProjectRow struct {
 	ProjectID       uuid.UUID `json:"project_id"`
 	ProjectName     string    `json:"project_name"`
 	Client          string    `json:"client"`
+	Color           *string   `json:"color"`
 	Currency        string    `json:"currency"`
 	Billable        bool      `json:"billable"`
 	HourlyRateCents *int64    `json:"hourly_rate_cents"`
@@ -611,6 +613,7 @@ func (q *Queries) SummaryByProject(ctx context.Context, arg SummaryByProjectPara
 			&i.ProjectID,
 			&i.ProjectName,
 			&i.Client,
+			&i.Color,
 			&i.Currency,
 			&i.Billable,
 			&i.HourlyRateCents,

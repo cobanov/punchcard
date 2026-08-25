@@ -23,6 +23,7 @@ type ProjectTotal struct {
 	ProjectID   uuid.UUID
 	Name        string
 	Client      string
+	Color       string
 	Seconds     int64
 	AmountCents *int64
 	Currency    string
@@ -52,8 +53,12 @@ func (d *Domain) SummaryByProject(ctx context.Context, p *auth.Principal, from, 
 		if !p.AllowsProject(r.ProjectID) {
 			continue
 		}
+		color := ""
+		if r.Color != nil {
+			color = *r.Color
+		}
 		out = append(out, ProjectTotal{
-			ProjectID: r.ProjectID, Name: r.ProjectName, Client: r.Client,
+			ProjectID: r.ProjectID, Name: r.ProjectName, Client: r.Client, Color: color,
 			Seconds: r.Seconds, Currency: r.Currency, Billable: r.Billable,
 			AmountCents: amountCents(r.Seconds, r.HourlyRateCents, r.Billable),
 		})

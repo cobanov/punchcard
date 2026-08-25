@@ -150,6 +150,7 @@ SELECT
     p.id            AS project_id,
     p.name          AS project_name,
     p.client        AS client,
+    p.color         AS color,
     p.currency      AS currency,
     p.billable      AS billable,
     p.hourly_rate_cents AS hourly_rate_cents,
@@ -164,7 +165,7 @@ WHERE ws.user_id = sqlc.arg(user_id)
   AND ws.ended_at IS NOT NULL
   AND ws.started_at < sqlc.arg(to_ts)::timestamptz
   AND ws.ended_at > sqlc.arg(from_ts)::timestamptz
-GROUP BY p.id, p.name, p.client, p.currency, p.billable, p.hourly_rate_cents
+GROUP BY p.id, p.name, p.client, p.color, p.currency, p.billable, p.hourly_rate_cents
 ORDER BY seconds DESC;
 
 -- Day buckets are cut in the caller's timezone, not UTC: a session that runs

@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { api, type Project, type Repo } from "../lib/api";
 import { money } from "../lib/format";
+import { COLOR_NAMES, PALETTE, projectColor } from "../lib/palette";
 
 /**
  * Projects: what time is booked against.
@@ -60,24 +61,43 @@ export function Projects({ projects, onChange }: { projects: Project[]; onChange
                 <button
                   onClick={() => setOpen(open === project.id ? null : project.id)}
                   aria-expanded={open === project.id}
-                  className="truncate text-left font-medium transition-colors hover:text-punch"
+                  className="flex min-w-0 items-center gap-2 text-left"
                 >
-                  {project.name}
+                  <span
+                    className="size-2 shrink-0 rounded-full"
+                    style={{ background: projectColor(project.color, project.id) }}
+                    aria-hidden
+                  />
+                  <span className="truncate font-medium transition-colors hover:text-punch">
+                    {project.name}
+                  </span>
                 </button>
                 <span className="truncate text-dim">{project.client || "—"}</span>
-                <RateCell project={project} onSave={(body) => run(() => api.updateProject(project.id, body))} />
+                <span className="tbl-num t-body text-dim">
+                  {project.hourly_rate_cents != null
+                    ? `${money(project.hourly_rate_cents, project.currency)}/h`
+                    : "—"}
+                </span>
                 <button
-                  onClick={() =>
+                  onClick={() => setOpen(open === project.id ? null : project.id)}
+                  aria-label={`Edit ${project.name}`}
+                  className="btn-bare t-caption text-right"
+                >
+                  {open === project.id ? "close" : "edit"}
+                </button>
+              </div>
+              {open === project.id && (
+                <ProjectEditor
+                  project={project}
+                  onSave={(body) => run(() => api.updateProject(project.id, body))}
+                  onArchive={() =>
                     confirm(`Archive ${project.name}? Its recorded time is kept.`) &&
                     run(() => api.deleteProject(project.id))
                   }
-                  aria-label={`Archive ${project.name}`}
-                  className="btn-bare t-caption text-right"
-                >
-                  archive
-                </button>
-              </div>
-              {open === project.id && <RepoRow projectID={project.id} onError={setError} />}
+                  onClose={() => setOpen(null)}
+                  onError={setError}
+                />
+              )}
             </li>
           ))}
           {!projects.length && (
@@ -91,65 +111,211 @@ export function Projects({ projects, onChange }: { projects: Project[]; onChange
   );
 }
 
-/** The rate, edited where it is shown. */
-function RateCell({
+/**
+ * The project editor.
+ *
+ * Everything about a project in one place, opened from its own row. It replaces
+ * a screen where the only editable thing was the rate — and it was edited by
+ * clicking the number itself, which nothing on the row said you could do. A
+ * project's name and client were not editable at all once created.
+ *
+ * Save stays disabled until something is actually different, so pressing it
+ * always means something happened, and archiving sits at the far end behind a
+ * confirmation rather than next to the fields.
+ */
+function ProjectEditor({
   project,
   onSave,
+  onArchive,
+  onClose,
+  onError,
 }: {
   project: Project;
   onSave: (body: Record<string, unknown>) => void;
+  onArchive: () => void;
+  onClose: () => void;
+  onError: (m: string) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState("");
+  const [name, setName] = useState(project.name);
+  const [client, setClient] = useState(project.client ?? "");
+  const [color, setColor] = useState(project.color ?? "");
+  // Rates are typed in whole currency units — 2500, not 250000 — because that
+  // is how a person says them. The conversion happens at this edge.
+  const [rate, setRate] = useState(
+    project.hourly_rate_cents == null ? "" : (project.hourly_rate_cents / 100).toFixed(2),
+  );
+  const [currency, setCurrency] = useState(project.currency);
 
-  if (!editing) {
-    const shown =
-      project.billable && project.hourly_rate_cents != null
-        ? `${money(project.hourly_rate_cents, project.currency)}/h`
-        : "—";
-    return (
-      <button
-        onClick={() => {
-          setValue(
-            project.hourly_rate_cents == null ? "" : (project.hourly_rate_cents / 100).toFixed(2),
-          );
-          setEditing(true);
-        }}
-        title="Change the hourly rate"
-        className="tbl-num t-body text-dim transition-colors hover:text-text"
-      >
-        {shown}
-      </button>
-    );
-  }
+  const originalRate =
+    project.hourly_rate_cents == null ? "" : (project.hourly_rate_cents / 100).toFixed(2);
+  const dirty =
+    name !== project.name ||
+    client !== (project.client ?? "") ||
+    color !== (project.color ?? "") ||
+    rate.trim() !== originalRate ||
+    currency !== project.currency;
 
   const save = () => {
-    setEditing(false);
-    const typed = value.trim();
-    // Empty clears the rate entirely — "not costed" is a real state, and it is
-    // not the same state as costed at zero.
-    onSave(
-      typed === ""
+    if (!name.trim()) return;
+    const typed = rate.trim();
+    onSave({
+      name: name.trim(),
+      client: client.trim(),
+      // An empty string clears the colour; the API distinguishes it from absent.
+      color,
+      currency,
+      // Empty clears the rate entirely — "not costed" is a real state, and it is
+      // not the same state as costed at zero.
+      ...(typed === ""
         ? { clear_hourly_rate: true }
-        : { hourly_rate_cents: Math.round(parseFloat(typed) * 100) },
-    );
+        : { hourly_rate_cents: Math.round(parseFloat(typed) * 100) }),
+    });
+    onClose();
   };
 
   return (
-    <input
-      autoFocus
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={save}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") save();
-        if (e.key === "Escape") setEditing(false);
-      }}
-      inputMode="decimal"
-      aria-label={`Hourly rate for ${project.name}, in ${project.currency}`}
-      placeholder="empty = none"
-      className="field tbl-num w-full py-0.5 t-body"
-    />
+    <div className="space-y-3 border-t border-line bg-ink/40 px-3 py-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Labelled label="Name">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && save()}
+            aria-label="Project name"
+            className="field w-full py-1"
+          />
+        </Labelled>
+        <Labelled label="Client">
+          <input
+            value={client}
+            onChange={(e) => setClient(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && save()}
+            placeholder="none"
+            aria-label="Client"
+            className="field w-full py-1"
+          />
+        </Labelled>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Labelled label="Rate" hint="per hour — empty means not costed">
+          <div className="flex gap-2">
+            <input
+              value={rate}
+              onChange={(e) => setRate(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && save()}
+              inputMode="decimal"
+              placeholder="—"
+              aria-label="Hourly rate"
+              className="field tbl-num min-w-0 flex-1 py-1"
+            />
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              aria-label="Currency"
+              className="select py-1"
+            >
+              {["TRY", "USD", "EUR", "GBP"].map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        </Labelled>
+        <Labelled label="Colour" hint="how this project reads in analytics">
+          <Swatches value={color} onChange={setColor} projectID={project.id} />
+        </Labelled>
+      </div>
+
+      <RepoRow projectID={project.id} onError={onError} />
+
+      <div className="flex items-center gap-2 border-t border-line/60 pt-3">
+        <button onClick={save} disabled={!dirty || !name.trim()} className="btn-primary py-1">
+          Save
+        </button>
+        <button onClick={onClose} className="btn-ghost">
+          Cancel
+        </button>
+        <button
+          onClick={onArchive}
+          className="btn-bare ml-auto t-caption hover:text-punch"
+        >
+          Archive project
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** A field and its name, so the editor reads as a form rather than a row of
+ *  unlabelled boxes. */
+function Labelled({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="eyebrow mb-1 block">{label}</span>
+      {children}
+      {hint && <span className="t-caption mt-1 block text-faint">{hint}</span>}
+    </label>
+  );
+}
+
+/**
+ * The colour choice.
+ *
+ * Eight swatches and an "auto". Auto is the default and is not an absence: an
+ * unset project still gets a stable colour derived from its id, so the charts
+ * read as separate projects before anybody configures anything. The swatch for
+ * auto therefore shows the colour it would actually be, not a grey blank.
+ */
+function Swatches({
+  value,
+  onChange,
+  projectID,
+}: {
+  value: string;
+  onChange: (c: string) => void;
+  projectID: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <button
+        onClick={() => onChange("")}
+        aria-pressed={value === ""}
+        title="Automatic"
+        className={
+          value === ""
+            ? "flex size-6 items-center justify-center rounded-full ring-2 ring-text ring-offset-2 ring-offset-ink"
+            : "flex size-6 items-center justify-center rounded-full"
+        }
+      >
+        <span
+          className="size-3.5 rounded-full opacity-60"
+          style={{ background: projectColor(undefined, projectID) }}
+        />
+      </button>
+      {COLOR_NAMES.map((c) => (
+        <button
+          key={c}
+          onClick={() => onChange(c)}
+          aria-pressed={value === c}
+          aria-label={c}
+          title={c}
+          className={
+            value === c
+              ? "size-6 rounded-full ring-2 ring-text ring-offset-2 ring-offset-ink"
+              : "size-6 rounded-full transition-transform hover:scale-110"
+          }
+          style={{ background: PALETTE[c] }}
+        />
+      ))}
+    </div>
   );
 }
 

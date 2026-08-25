@@ -77,6 +77,8 @@ export interface ProjectTotal {
   project_id: string;
   name: string;
   client?: string;
+  /** Palette name, absent when the project has none set. */
+  color?: string;
   seconds: number;
   amount_cents: number | null;
   currency: string;

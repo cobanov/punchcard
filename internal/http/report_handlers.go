@@ -12,6 +12,7 @@ type ProjectTotalDTO struct {
 	ProjectID   string `json:"project_id"`
 	Name        string `json:"name"`
 	Client      string `json:"client,omitempty"`
+	Color       string `json:"color,omitempty" doc:"Palette name, not a hex value. Empty when the project has no colour set."`
 	Seconds     int64  `json:"seconds"`
 	AmountCents *int64 `json:"amount_cents" doc:"Minor units. null when the project is not costed or not billable — which is not the same as zero."`
 	Currency    string `json:"currency"`
@@ -94,7 +95,7 @@ func (d Deps) registerReportRoutes(api huma.API) {
 		rows := make([]ProjectTotalDTO, 0, len(totals))
 		for _, row := range totals {
 			rows = append(rows, ProjectTotalDTO{
-				ProjectID: row.ProjectID.String(), Name: row.Name, Client: row.Client,
+				ProjectID: row.ProjectID.String(), Name: row.Name, Client: row.Client, Color: row.Color,
 				Seconds: row.Seconds, AmountCents: row.AmountCents,
 				Currency: row.Currency, Billable: row.Billable,
 			})

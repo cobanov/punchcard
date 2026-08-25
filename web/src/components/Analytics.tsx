@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { api, type ProjectTotal } from "../lib/api";
 import { money, total } from "../lib/format";
+import { projectColor } from "../lib/palette";
 
 /**
  * Analytics: what happened, and whether it is more or less than before.
@@ -405,7 +406,14 @@ function Breakdown({
           return (
             <li key={p.project_id} className="pb-2 pt-1">
               <div className="tbl-row">
-                <span className="truncate font-medium">{p.name}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="size-2 shrink-0 rounded-full"
+                    style={{ background: projectColor(p.color, p.project_id) }}
+                    aria-hidden
+                  />
+                  <span className="truncate font-medium">{p.name}</span>
+                </span>
                 <span className="truncate text-dim">{p.client || "—"}</span>
                 <span className="tbl-num t-caption text-faint">{share}%</span>
                 <span className="tbl-num text-dim">{total(p.seconds)}</span>
@@ -417,8 +425,18 @@ function Breakdown({
                   )}
                 </span>
               </div>
+              {/* The bar wears the project's own colour, not the app's amber.
+                  Amber means running time and the commits that prove it; a
+                  static share of a finished range is neither. */}
               <div className="mx-3 h-1 overflow-hidden rounded-full bg-raise" aria-hidden>
-                <div className="h-full rounded-full bg-punch/70" style={{ width: `${share}%` }} />
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${share}%`,
+                    background: projectColor(p.color, p.project_id),
+                    opacity: 0.8,
+                  }}
+                />
               </div>
             </li>
           );
