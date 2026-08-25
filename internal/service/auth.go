@@ -361,10 +361,10 @@ func (a *Auth) ConfirmPasswordReset(ctx context.Context, token, newPassword, ip 
 
 // CreateTokenInput describes a new PAT.
 type CreateTokenInput struct {
-	Name          string
-	Scope         string
+	Name             string
+	Scope            string
 	ScopedProjectIDs []uuid.UUID
-	ExpiresAt     *time.Time
+	ExpiresAt        *time.Time
 }
 
 // CreateToken mints a PAT. Returns the token row and the full secret (shown
@@ -640,9 +640,9 @@ func (a *Auth) AuthenticatePAT(ctx context.Context, token string) (*auth.Princip
 		EmailVerified: row.User.EmailVerifiedAt != nil,
 		// A device token is punchcard's own client signing in, not an automation
 		// the user handed a key to. See Principal.FirstParty.
-		ViaDevice:     row.ApiToken.Kind == auth.TokenKindDevice,
-		TokenID:       &tid,
-		Scope:         row.ApiToken.Scope,
+		ViaDevice:        row.ApiToken.Kind == auth.TokenKindDevice,
+		TokenID:          &tid,
+		Scope:            row.ApiToken.Scope,
 		ScopedProjectIDs: row.ApiToken.ScopedProjectIds,
 	}, nil
 }

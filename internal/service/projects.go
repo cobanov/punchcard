@@ -2,13 +2,11 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	"github.com/cobanov/punchcard/internal/auth"
 	"github.com/cobanov/punchcard/internal/events"
@@ -224,7 +222,7 @@ func (d *Domain) DeleteProject(ctx context.Context, p *auth.Principal, projectID
 	}
 	if n > 0 {
 		proj, err := d.store.ArchiveProject(ctx, db.ArchiveProjectParams{ID: projectID, OwnerID: p.UserID})
-		if err != nil && errors.Is(err, pgx.ErrNoRows) {
+		if err != nil && repo.IsNotFound(err) {
 			// Already archived: the caller's intent is satisfied.
 			return true, nil
 		}
@@ -262,7 +260,7 @@ func (d *Domain) LinkRepo(ctx context.Context, p *auth.Principal, projectID uuid
 		ID: id, ProjectID: projectID, FullName: fullName,
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if repo.IsNotFound(err) {
 			// ON CONFLICT DO NOTHING: already linked, which is the desired state.
 			repos, lerr := d.store.ListProjectRepos(ctx, projectID)
 			if lerr != nil {
@@ -333,7 +331,7 @@ func nullableString(s string) *string {
 }
 
 func mapNotFound(err error) error {
-	if errors.Is(err, pgx.ErrNoRows) {
+	if repo.IsNotFound(err) {
 		return ErrNotFound
 	}
 	return err

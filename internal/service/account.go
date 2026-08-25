@@ -15,11 +15,6 @@ import (
 	"github.com/cobanov/punchcard/internal/repo/db"
 )
 
-// exportPageSize bounds how many sessions are held in memory at once while
-// streaming the export, so the endpoint cannot be used to exhaust the heap
-// regardless of how much history the account has.
-const exportPageSize = 1000
-
 // DeleteAccount hard-deletes the user and everything they own. Session-only.
 //
 // helva blocked this while the user owned shared lists, because deleting them

@@ -1,0 +1,122 @@
+# punchcard — working notes
+
+What follows is what the code cannot tell you: the traps, and the decisions whose
+reasons are not recoverable from reading the result.
+
+For what the project is and how to run it, see `README.md`. For why it is shaped
+this way, see `docs/superpowers/specs/2026-08-25-punchcard-design.md`.
+
+## How work is verified
+
+**`make check` is the only gate**: `go vet` · `golangci-lint` · `gosec` ·
+`govulncheck` · `openapi-check` · `go test -race ./...` against real Postgres ·
+`build`. There is no CI; releases and deploys are by hand.
+
+> **The trap:** `make check` needs `DOCKER_HOST` exported or `testutil.Postgres`
+> **skips every integration test** and the run looks green having tested nothing.
+> On this Mac (OrbStack):
+> ```
+> export DOCKER_HOST=unix:///Users/cobanov/.orbstack/run/docker.sock
+> ```
+> Confirm the output reads `ok … internal/http` (~10s) and `ok … internal/service`
+> (~6s). A sub-second pass is a failed run wearing green. OrbStack also has to be
+> *running*: `docker info` must answer before the suite means anything.
+
+**`make openapi` after any route change.** `openapi-check` fails the gate if
+`docs/openapi.json` drifts from the code, and the drift is easy to cause: adding
+a field to a handler's input struct changes the document.
+
+## Invariants
+
+### The two names that must never merge
+
+helva called browser logins `sessions`. punchcard calls a stretch of work a
+session. They are different tables and they are named apart on purpose:
+
+- `auth_sessions` — cookie logins
+- `work_sessions` — the timer
+
+The API path `/v1/sessions` means the second one. If you ever find yourself
+writing a query against a table called `sessions`, something has gone wrong.
+
+### Two rules live in the database, not the service
+
+```sql
+CREATE UNIQUE INDEX one_open_session_per_user ON work_sessions (user_id)
+    WHERE ended_at IS NULL AND deleted_at IS NULL;
+CREATE UNIQUE INDEX idx_session_commits_commit ON session_commits (commit_id);
+```
+
+These are not belt-and-braces. Commit attribution asks "which session covers this
+instant?" and assumes the answer is at most one. Two open sessions make time
+ranges overlap, a commit lands in two records, and every report that touches
+those days is quietly wrong — with no error anywhere. A service-layer check would
+lose that race between two clients. Do not move these into Go.
+
+The consequence for `StartSession`: closing the old session and opening the new
+one happen in **one transaction**. Any other order hits the index and returns a
+constraint violation to a user who did nothing wrong.
+
+### Money is integer minor units
+
+`hourly_rate_cents` is a `bigint`, amounts are `seconds * rate / 3600` in integer
+arithmetic. No float touches money anywhere in this codebase. 333.33/hour for
+ninety minutes has exactly one correct answer and binary floating point is not
+how you get it.
+
+### Day boundaries are drawn in the user's timezone
+
+`users.timezone` exists for one reason: a session from 22:30 to 23:30 UTC belongs
+to the *next* day in Istanbul. Reports group with
+`date_trunc('day', started_at AT TIME ZONE $tz)`, never on the raw timestamp.
+Everything is stored UTC; only presentation shifts.
+
+### GitHub's commit listing only sees the default branch
+
+`GET /repos/{o}/{r}/commits` with no `sha` parameter walks the default branch and
+nothing else. Anyone working on a feature branch gets **zero** commits back — and
+zero looks exactly like "no work happened", so it never gets reported as a bug.
+
+The scanner therefore fetches the branch list and walks every branch, deduping by
+SHA. This is the single most important thing in `internal/github`. Do not
+"simplify" it back to one call.
+
+Second trap, same feature: a commit that has not been pushed does not exist as far
+as the API is concerned. The first scan at stop-time will miss it. That is why
+the janitor re-queues the last seven days every hour — a commit written at 09:00
+and pushed at 18:00 still finds its session.
+
+### Events are scoped to the account
+
+helva scoped its outbox and webhooks to a shared list because lists had members.
+punchcard has no sharing: `events.user_id` is the filter, `project_id` rides
+along for convenience. There is no membership to cache, invalidate, or revoke
+mid-stream.
+
+### Someone else's row is a 404, never a 403
+
+A 403 confirms the row exists. Every ownership check returns `ErrNotFound`.
+
+## What was deliberately left behind
+
+Ported from helva and then removed, so you do not go looking for them: lists,
+tasks, memberships, invites, the ordering (`position`) machinery, the activity
+log, the Gemini chat, the MCP surface, offline sync, and the entire `web/` tree
+with its embedded-dist deploy traps. v1 serves no HTML but the OpenAPI explorer.
+
+Kept because they cost nothing and the CLI will want them: `internal/service/native_code.go`
+(the browser-to-client code exchange a `punchcard login` command would use) and
+the webhook/SSE machinery.
+
+## Layout
+
+```
+cmd/punchcard/main.go   serve, migrate
+db/migrations/          the schema; sqlc reads it as the source of truth
+db/queries/             hand-written SQL → make sqlc → internal/repo/db
+internal/repo/          all database access; the depguard rule keeps pgx here
+internal/service/       domain logic and authorization
+internal/github/        REST client + branch-walking scanner
+internal/http/          huma operations, middleware, SSE
+deploy/                 compose + Caddy for self-hosting
+```
