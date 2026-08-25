@@ -138,9 +138,40 @@ func TestStoppingQueuesACommitScan(t *testing.T) {
 	if stopped.SyncState != "pending" {
 		t.Fatalf("sync_state = %q, want pending", stopped.SyncState)
 	}
-	if stopped.SyncNextAt == nil {
-		t.Fatal("sync_next_at must be set so the janitor picks the session up")
+	// NULL means "due now". It used to be now(), which compared the database's
+	// clock against the Go process's — a few milliseconds of drift and the scan
+	// waited a whole tick, or in a test, never ran at all.
+	if stopped.SyncNextAt != nil {
+		t.Fatalf("sync_next_at = %v, want NULL so the session is due immediately", stopped.SyncNextAt)
 	}
+}
+
+// The regression that made three scan tests flaky: a session queued at stop
+// time must be claimable on the very next pass, whatever the two clocks think
+// of each other.
+func TestASessionQueuedAtStopIsImmediatelyClaimable(t *testing.T) {
+	e := newTestEnv(t)
+	p := e.newUser(t)
+	proj := e.mustProject(t, p, "p")
+	ws := e.mustStart(t, p, proj.ID, "bir")
+	if _, err := e.d.StopSession(e.ctx, p, ws.ID, time.Now()); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+
+	// Claim with a `now` deliberately BEHIND the database's clock, which is the
+	// skew that broke it.
+	claimed, err := e.d.store.ClaimPendingSyncSessions(e.ctx, db.ClaimPendingSyncSessionsParams{
+		Now: time.Now().Add(-time.Hour), Lim: 10,
+	})
+	if err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	for _, c := range claimed {
+		if c.ID == ws.ID {
+			return
+		}
+	}
+	t.Fatalf("the session was not claimable; claimed %d rows", len(claimed))
 }
 
 // A zero-length session is not a record of anything, and the range CHECK would

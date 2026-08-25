@@ -30,6 +30,11 @@ tools: ## Install pinned dev tools into $GOPATH/bin
 	go install github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION)
 
 .PHONY: build
+cli: ## Install the punchcard CLI into $GOPATH/bin
+	go install -ldflags "-X main.version=$(VERSION)" ./cmd/punchcard-cli
+	@echo "installed: $(GOBIN)/punchcard-cli — rename or alias it to 'punchcard'"
+
+.PHONY: build
 build: ## Build the binary
 	go build $(LDFLAGS) -o $(BINARY) ./cmd/punchcard
 

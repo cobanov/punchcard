@@ -86,6 +86,18 @@ as the API is concerned. The first scan at stop-time will miss it. That is why
 the janitor re-queues the last seven days every hour — a commit written at 09:00
 and pushed at 18:00 still finds its session.
 
+### "Due now" is NULL, not a timestamp
+
+`work_sessions.sync_next_at` being NULL means the scan is due immediately. A
+real timestamp means one thing only: a backoff deadline.
+
+It used to be set to `now()` on queueing — the DATABASE's clock — and then
+compared against a time the Go process captured from ITS clock. A few
+milliseconds of drift between the host and the Postgres container and a session
+queued at stop-time was not yet "due", so the scan waited a whole tick. In tests
+it failed outright, intermittently, which is the worst way to find out. NULL has
+no clock in it.
+
 ### Events are scoped to the account
 
 helva scoped its outbox and webhooks to a shared list because lists had members.

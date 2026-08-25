@@ -38,6 +38,33 @@ Three secrets decide what works:
 
 Generate the last one with `openssl rand -base64 32`.
 
+## The CLI
+
+The only client that exists today. It talks to the same public API as anything
+else would — there is no privileged path.
+
+```bash
+go install github.com/cobanov/punchcard/cmd/punchcard-cli@latest
+alias punchcard=punchcard-cli      # or rename the binary
+
+punchcard login                    # opens the browser once
+punchcard start caps "yorum sistemi refactor"
+punchcard status
+punchcard stop
+punchcard today
+```
+
+`login` binds a loopback listener, opens the browser at the server's GitHub
+sign-in, and trades the one-time code it gets back for a device token — the
+token itself never passes through the browser, so it never reaches browser
+history or OS logs. It is stored in your config directory, mode 0600.
+
+The project name is a prefix: `caps` finds `capsarsiv`. An exact name always
+wins, and an ambiguous prefix tells you what it matched.
+
+`--json` on any command gives machine-readable output; `PUNCHCARD_URL` or
+`--url=` points it at a self-hosted instance.
+
 ## Local development
 
 ```bash
@@ -54,7 +81,9 @@ tests skip and the run goes green having tested nothing.
 ## How it fits together
 
 ```
-cmd/punchcard        the single binary: serve, migrate
+cmd/punchcard        the server binary: serve, migrate
+cmd/punchcard-cli    the command-line client
+internal/cli         the client's logic, tested against a fake API
 db/migrations        the schema — the only source of truth (sqlc reads it)
 db/queries           hand-written SQL; `make sqlc` generates the Go
 internal/repo        every database access; nothing else imports pgx

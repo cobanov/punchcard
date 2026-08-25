@@ -20,7 +20,7 @@ UPDATE work_sessions
 SET ended_at = GREATEST(sqlc.arg(at)::timestamptz, started_at + interval '1 microsecond'),
     updated_at = now(),
     sync_state = 'pending',
-    sync_next_at = now(),
+    sync_next_at = NULL,
     sync_attempts = 0,
     sync_error = NULL
 WHERE user_id = sqlc.arg(user_id) AND ended_at IS NULL AND deleted_at IS NULL
@@ -31,7 +31,7 @@ UPDATE work_sessions
 SET ended_at = GREATEST(sqlc.arg(at)::timestamptz, started_at + interval '1 microsecond'),
     updated_at = now(),
     sync_state = 'pending',
-    sync_next_at = now(),
+    sync_next_at = NULL,
     sync_attempts = 0,
     sync_error = NULL
 WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id)
@@ -83,18 +83,30 @@ LIMIT 1;
 
 -- name: MarkSessionSyncPending :exec
 UPDATE work_sessions
-SET sync_state = 'pending', sync_next_at = now(), sync_attempts = 0, sync_error = NULL,
+SET sync_state = 'pending', sync_next_at = NULL, sync_attempts = 0, sync_error = NULL,
     updated_at = now()
 WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL;
 
 -- name: MarkSessionsSyncPendingSince :execrows
 UPDATE work_sessions
-SET sync_state = 'pending', sync_next_at = now()
+SET sync_state = 'pending', sync_next_at = NULL
 WHERE ended_at IS NOT NULL
   AND deleted_at IS NULL
   AND ended_at > sqlc.arg(since)::timestamptz
   AND sync_state IN ('ok', 'error');
 
+-- NULL sync_next_at means "due now", and it is how every immediate queueing
+-- writes itself. That is not a shortcut — it removes a clock comparison.
+--
+-- sync_next_at used to be set to now(), which is the DATABASE's clock, and then
+-- compared against a timestamp the Go process captured from ITS clock. On a
+-- host whose container clock drifts a few milliseconds ahead, a session queued
+-- at stop-time was not yet "due" on the next pass and the scan silently waited
+-- a full tick. In tests, which claim immediately, it failed outright — and
+-- intermittently, which is the worst way to learn about it.
+--
+-- A real timestamp now means only one thing: a backoff deadline, written by the
+-- same code that reads it.
 -- name: ClaimPendingSyncSessions :many
 SELECT * FROM work_sessions
 WHERE sync_state = 'pending'
