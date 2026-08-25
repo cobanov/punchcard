@@ -279,6 +279,7 @@ func (d *Domain) SessionFromCluster(ctx context.Context, p *auth.Principal, in C
 	if err := d.ReconcileAgentRuns(ctx, p.UserID); err != nil {
 		return stopped, err
 	}
+	d.learnClusterLink(ctx, in.ProjectID, stopped.ID, commits)
 	return stopped, nil
 }
 
@@ -295,4 +296,46 @@ func truncateRunes(s string, max int) string {
 		return s
 	}
 	return string(r[:max])
+}
+
+// learnClusterLink links the recovered window's repository to the chosen
+// project — but only when the window names exactly one. Recording is the
+// moment the user explicitly connects evidence to a project, which is how the
+// link table grows without a setup step; the one-repo guard exists because
+// recovering a mixed morning into a catch-all must not teach the catch-all to
+// claim every repository in it. Best-effort: a failed lesson never fails the
+// recovery that taught it.
+func (d *Domain) learnClusterLink(ctx context.Context, projectID, sessionID uuid.UUID, commits []db.Commit) {
+	repos := map[string]bool{}
+	for _, c := range commits {
+		if c.RepoFullName != "" {
+			repos[c.RepoFullName] = true
+		}
+	}
+	runs, err := d.store.ListAgentRunsForSession(ctx, sessionID)
+	if err != nil {
+		d.log.WarnContext(ctx, "could not list runs for link learning", "error", err.Error())
+		return
+	}
+	for _, r := range runs {
+		if r.RepoFullName != "" {
+			repos[r.RepoFullName] = true
+		}
+	}
+	if len(repos) != 1 {
+		return
+	}
+	var full string
+	for name := range repos {
+		full = name
+	}
+	id, err := uuid.NewV7()
+	if err != nil {
+		return
+	}
+	if _, err := d.store.LinkProjectRepo(ctx, db.LinkProjectRepoParams{
+		ID: id, ProjectID: projectID, FullName: full,
+	}); err != nil && !isNoRows(err) { // conflict = already linked, which is fine
+		d.log.WarnContext(ctx, "could not learn project link", "repo", full, "error", err.Error())
+	}
 }
