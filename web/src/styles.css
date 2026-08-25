@@ -3,82 +3,146 @@
 /* IBM Plex, bundled rather than fetched.
  *
  * IBM made the punch card, which is where the product's name and its central
- * image come from — so the typeface is not a neutral choice here, it is the
- * subject's own. Bundling rather than linking Google Fonts keeps a self-hosted
- * instance self-contained: no outbound request, nothing to fail on a corporate
- * network, nothing that stops working offline. */
+ * image come from — so the typeface is the subject's own rather than a neutral
+ * default. Bundling instead of linking a font host keeps a self-hosted instance
+ * self-contained: nothing to be unreachable, nothing that breaks offline. */
 @import "@fontsource/ibm-plex-sans/400.css";
 @import "@fontsource/ibm-plex-sans/500.css";
 @import "@fontsource/ibm-plex-sans/600.css";
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 
-/* Graphite and amber.
- *
- * Dark first, because this is a tool that sits open next to an editor all day.
- * The one accent is the colour of light coming through a punched hole — which
- * is literally what the interface draws. It appears on the running timer, on
- * commits, and on the primary action, and nowhere else: an accent that shows up
- * everywhere stops meaning anything. */
 @theme {
-  --color-ink: #0e0f12;
-  --color-card: #16181d;
-  --color-raise: #1c1f26;
-  --color-line: #23262e;
-  --color-text: #e4e6eb;
-  --color-dim: #8b909c;
-  --color-faint: #5a5f6b;
-  --color-punch: #f0a93b;
-  --color-punch-dim: #7a5a24;
-  --color-ghost: #3d424e;
+  /* Cool graphite, one warm accent.
+   *
+   * The first pass mixed a warm ground with a warm accent and landed on the
+   * cream-and-amber look every generated page arrives in. Everything neutral is
+   * cool-tinted now, from one family, so the accent is the only warm thing on
+   * screen — which is what makes it read as light coming through a hole rather
+   * than as decoration. */
+  --color-ink: #0c0d10;
+  --color-card: #131519;
+  --color-raise: #191c21;
+  --color-line: #22252b;
+  --color-line-strong: #2d313a;
+  --color-text: #e8eaee;
+  --color-dim: #868d9a;
+  --color-faint: #565d69;
+  --color-punch: #e9973f;
+  --color-punch-deep: #4a3616;
+  --color-ghost: #343943;
+
+  /* Solid buttons are neutral, not amber.
+   *
+   * Amber means one thing in this product — time running, and the evidence of
+   * it. Spending it on chrome as well would make it mean nothing, and on a
+   * light background it turned muddy brown. So the primary action is the
+   * highest-contrast neutral there is, which is also what makes the running
+   * clock the only coloured thing on screen. */
+  --color-solid: #e8eaee;
+  --color-solid-fg: #0c0d10;
 
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  /* One hour of the day is this tall. Everything in the day card — band
-   * heights, punch positions, the hour rail — is derived from it, so the
-   * timeline stays honest: a two-hour session is exactly twice a one-hour one. */
-  --hour: 2.75rem;
+  /* One hour of the day. Band heights, punch positions and the hour rail are all
+   * derived from it, so the timeline stays honest: two hours is exactly twice
+   * one hour. Tight, because a working day has to fit on a screen. */
+  --hour: 2.25rem;
 }
 
-/* Light mode is a real mode, not an inversion. The card stock a punch card was
- * actually made of was buff, and the ink was near-black. */
 @media (prefers-color-scheme: light) {
   @theme {
-    --color-ink: #f7f5f1;
+    --color-ink: #fbfbfc;
     --color-card: #ffffff;
-    --color-raise: #f1eee8;
-    --color-line: #e2ded5;
-    --color-text: #1a1a17;
-    --color-dim: #6d6960;
-    --color-faint: #9a958a;
-    --color-punch: #b8760d;
-    --color-punch-dim: #e8d3ab;
-    --color-ghost: #c9c3b6;
+    --color-raise: #f1f2f4;
+    --color-line: #e4e6ea;
+    --color-line-strong: #d3d6dc;
+    --color-text: #13151a;
+    --color-dim: #5f6570;
+    --color-faint: #9198a3;
+    --color-punch: #b8690a;
+    --color-punch-deep: #edd9b8;
+    --color-ghost: #cbcfd6;
+    --color-solid: #16181d;
+    --color-solid-fg: #fbfbfc;
   }
 }
 
 @layer base {
   html {
     color-scheme: dark light;
+    scroll-behavior: smooth;
   }
+
   body {
     @apply bg-ink text-text font-sans antialiased;
-    font-size: 14px;
+    /* 13px, the density a tool that sits open all day is read at. */
+    font-size: 13px;
+    line-height: 1.5;
+
+    /* Card stock has grain. A flat vector plane reads as sterile, and this is
+     * the cheapest honest texture there is: one inline SVG, no request, 3%
+     * opacity — felt rather than seen. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.032'/%3E%3C/svg%3E");
   }
-  /* Keyboard focus stays visible everywhere. A tool people drive from the
-   * keyboard cannot hide where the keyboard is. */
+
+  /* A tool driven from the keyboard cannot hide where the keyboard is. */
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-punch;
+    @apply outline-1 outline-offset-2 outline-punch;
   }
+
   ::selection {
     background: var(--color-punch);
     color: var(--color-ink);
   }
+
+  /* Every number in this interface is compared against another number. */
+  .tnum,
+  input,
+  td {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* One button style, three weights of emphasis. A page where every action is
+   * a filled button has no primary action. */
+  /* Tailwind v4 will not let one component class @apply another, so the shared
+     shape is repeated rather than composed. Repetition here beats a base class
+     nobody can use on its own. */
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded px-2.5 py-1
+           bg-solid font-medium text-solid-fg transition duration-150
+           hover:opacity-90 active:scale-[0.98] disabled:opacity-40;
+  }
+  .btn-quiet {
+    @apply inline-flex items-center justify-center rounded border border-line
+           px-2.5 py-1 text-dim transition duration-150
+           hover:border-line-strong hover:text-text active:scale-[0.98]
+           disabled:opacity-40;
+  }
+  .btn-bare {
+    @apply text-faint transition-colors duration-150 hover:text-text;
+  }
+
+  .field {
+    @apply rounded border border-line bg-card px-2 py-1 text-text outline-none
+           transition-colors duration-150 placeholder:text-faint
+           focus:border-line-strong;
+  }
+
+  /* Small, wide-tracked, lowercase. Section labels should name a region without
+   * competing with what is in it. */
+  .eyebrow {
+    @apply text-[11px] font-medium tracking-[0.08em] text-faint uppercase;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
@@ -86,7 +150,26 @@
 
 /* A commit landing after a scan should be noticed, not announced. */
 @keyframes punch-in {
-  from { opacity: 0; transform: scale(0.4); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
-.punch-in { animation: punch-in 240ms cubic-bezier(0.2, 0.8, 0.3, 1); }
+.punch-in {
+  animation: punch-in 220ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/* Skeletons match the shape of what is loading, so the page does not jump when
+ * the data lands. */
+@keyframes shimmer {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 0.6; }
+}
+.skeleton {
+  @apply rounded bg-raise;
+  animation: shimmer 1.6s ease-in-out infinite;
+}

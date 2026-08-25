@@ -18,32 +18,24 @@ import (
 //go:embed all:dist
 var assets embed.FS
 
-// Handler serves the app, with every unmatched path falling back to index.html
-// so client-side routing works on a hard refresh.
+// Handler serves the application. Every unmatched path under it falls back to
+// index.html so client-side routing survives a hard refresh.
 func Handler() http.Handler {
-	dist, err := fs.Sub(assets, "dist")
-	if err != nil {
-		// The embed pattern not matching is a build-time fact, not a runtime
-		// condition — fail at wiring rather than serving a 500 later.
-		panic("webui: " + err.Error())
-	}
+	dist := sub()
 	files := http.FileServer(http.FS(dist))
-	index, err := fs.ReadFile(dist, "index.html")
-	if err != nil {
-		panic("webui: dist/index.html is missing — run make web")
-	}
+	index := mustRead(dist, "index.html")
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/")
 		if path == "" || path == "app" {
-			serveIndex(w, index)
+			servePage(w, index)
 			return
 		}
 		if _, err := fs.Stat(dist, path); err != nil {
-			serveIndex(w, index)
+			servePage(w, index)
 			return
 		}
-		// Vite fingerprints asset filenames, so they can be cached hard.
+		// Vite fingerprints asset filenames, so they can be cached forever.
 		if strings.HasPrefix(path, "assets/") {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		}
@@ -51,11 +43,41 @@ func Handler() http.Handler {
 	})
 }
 
-func serveIndex(w http.ResponseWriter, index []byte) {
+// Landing serves the marketing page at the root.
+//
+// It is a separate entry from the app deliberately: it is what a stranger sees
+// first, and it must paint without waiting for the application bundle. It ships
+// its own stylesheet and a script small enough to be inlined in one packet.
+func Landing() http.HandlerFunc {
+	page := mustRead(sub(), "landing.html")
+	return func(w http.ResponseWriter, r *http.Request) {
+		servePage(w, page)
+	}
+}
+
+func sub() fs.FS {
+	dist, err := fs.Sub(assets, "dist")
+	if err != nil {
+		// The embed pattern not matching is a build-time fact, not a runtime
+		// condition — fail at wiring rather than serving a 500 later.
+		panic("webui: " + err.Error())
+	}
+	return dist
+}
+
+func mustRead(dist fs.FS, name string) []byte {
+	body, err := fs.ReadFile(dist, name)
+	if err != nil {
+		panic("webui: dist/" + name + " is missing — run make web")
+	}
+	return body
+}
+
+func servePage(w http.ResponseWriter, body []byte) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// Never cached: it names the fingerprinted assets, so a stale index is a
-	// stale app.
+	// Never cached: it names the fingerprinted assets, so a stale page is a
+	// stale build.
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	_, _ = w.Write(index)
+	_, _ = w.Write(body)
 }

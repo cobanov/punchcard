@@ -177,7 +177,6 @@ export function App() {
               clusters={clusters}
               projects={projects}
               now={now}
-              onStop={() => void act(() => api.stop(current!.id))}
               onRecover={(cluster) =>
                 void act(() =>
                   api.recover({
@@ -285,21 +284,43 @@ function GitHubNote({ status }: { status: GitHubStatus | null }) {
   return null;
 }
 
+/** The door to the app.
+ *
+ *  Dark whatever the system says, because it is the same door as the front of
+ *  the site: someone arriving from the landing page should not watch the
+ *  product change identity on the way in. The punches are the only thing that
+ *  needs to be here — they are what the sign-in is for. */
 function SignIn() {
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-      <h1 className="text-2xl font-medium tracking-tight">punchcard</h1>
-      <p className="mt-2 text-dim">Time tracking for developers, with the commits attached.</p>
-      <a
-        href={signInURL}
-        className="mt-8 rounded-md bg-punch px-5 py-2.5 text-center font-medium text-ink transition hover:brightness-110"
-      >
-        Sign in with GitHub
-      </a>
-      <p className="mt-4 text-[12px] leading-relaxed text-faint">
-        One authorization signs you in and lets punchcard read the commits behind your work.
-        Nothing is written to your repositories.
-      </p>
+    <div className="fixed inset-0 flex items-center justify-center bg-[#08090b] px-6 text-[#ecedf0]">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex gap-1.5" aria-hidden>
+          {[1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 1, 0].map((on, i) => (
+            <span
+              key={i}
+              className={
+                on
+                  ? "h-6 w-2 rounded-[2px] bg-[#e9973f]"
+                  : "h-6 w-2 rounded-[2px] bg-[#1e2127]"
+              }
+            />
+          ))}
+        </div>
+        <h1 className="text-xl font-semibold tracking-tight">punchcard</h1>
+        <p className="mt-1.5 text-[#979da9]">
+          Time tracking for developers, with the commits attached.
+        </p>
+        <a
+          href={signInURL}
+          className="mt-7 block rounded-md bg-[#ecedf0] px-5 py-2.5 text-center font-medium text-[#08090b] transition hover:opacity-90 active:scale-[0.99]"
+        >
+          Sign in with GitHub
+        </a>
+        <p className="mt-4 text-[12px] leading-relaxed text-[#5b6068]">
+          One authorization signs you in and lets punchcard read the commits behind your work.
+          Nothing is written to your repositories.
+        </p>
+      </div>
     </div>
   );
 }

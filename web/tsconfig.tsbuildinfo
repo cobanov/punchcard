@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/components/daycard.tsx","./src/components/projects.tsx","./src/components/timerbar.tsx","./src/lib/api.ts","./src/lib/format.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/landing.ts","./src/main.tsx","./src/components/daycard.tsx","./src/components/projects.tsx","./src/components/timerbar.tsx","./src/lib/api.ts","./src/lib/format.ts"],"version":"5.9.3"}

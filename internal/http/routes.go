@@ -13,7 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/cobanov/punchcard/internal/config"
-	"github.com/cobanov/punchcard/internal/http/landing"
 	"github.com/cobanov/punchcard/internal/http/legal"
 	"github.com/cobanov/punchcard/internal/http/webui"
 	"github.com/cobanov/punchcard/internal/oauth"
@@ -123,10 +122,8 @@ func BuildRouter(d Deps) (*chi.Mux, huma.API) {
 	d.registerAccountRoutes(api)
 	d.registerWebhookRoutes(api)
 
-	// The one page this release has. v1 serves no SPA, and before this existed
-	// the bare hostname answered chi's default "404 page not found" — a healthy
-	// service that read as broken to whoever opened it.
-	r.Get("/", landing.Handler())
+	// The marketing page. Its own entry, so it paints without the app bundle.
+	r.Get("/", webui.Landing())
 
 	// The web application. Everything under /app, plus the fingerprinted assets
 	// it names, with a fallback to index.html so a hard refresh on a client

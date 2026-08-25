@@ -1,0 +1,517 @@
+/* The landing page.
+ *
+ * Written as its own stylesheet rather than in Tailwind, on purpose: it ships
+ * before any JavaScript and shares nothing with the application, so it should
+ * not carry the application's utility layer either. Everything here is about
+ * one page, and it is the only page most people will ever see.
+ *
+ * Committed to dark. The app follows the system, but a marketing page that
+ * flips between two identities has no identity — and the whole visual idea is
+ * light coming through holes, which needs a dark room. */
+
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+
+:root {
+  --ink: #08090b;
+  --text: #ecedf0;
+  --dim: #979da9;
+  --faint: #5b6068;
+  --line: #1e2127;
+  --punch: #e9973f;
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --wrap: 68rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
+body.landing {
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font: 400 15px/1.6 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--punch);
+  color: var(--ink);
+  padding: 0.6rem 1rem;
+}
+.skip:focus {
+  left: 0;
+}
+
+:focus-visible {
+  outline: 1px solid var(--punch);
+  outline-offset: 3px;
+}
+
+/* --- The card field ----------------------------------------------------- */
+
+/* The top band: nav, hero, and the card behind both. Nothing below it sees the
+   card, because a field bright enough to be an image is a field too bright to
+   read body copy over — which is exactly how the first attempt failed. */
+.top {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding-bottom: 11rem;
+}
+
+.card-field {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  /* Laid back in space so it recedes rather than sitting behind the text like a
+     wallpaper pattern. A punch card is a physical object; it should read as
+     one. */
+  perspective: 1200px;
+  pointer-events: none;
+}
+
+.card-field svg {
+  position: absolute;
+  left: 50%;
+  bottom: -34%;
+  width: 190%;
+  height: 118%;
+  transform: translateX(-50%) rotateX(66deg);
+  transform-origin: 50% 100%;
+  /* Fades out at both ends so the card has no edge anywhere — it recedes into
+     the dark above the headline and dissolves into the page below. The first
+     version ended on a hard horizontal line, which read as a stripe rather than
+     as a surface going away from you. */
+  mask-image: linear-gradient(
+    to top,
+    transparent 0%,
+    rgba(0, 0, 0, 0.5) 8%,
+    #000 26%,
+    #000 52%,
+    transparent 92%
+  );
+}
+
+.card-field rect.off {
+  fill: #171a20;
+}
+
+/* The punched holes are the only light on the page, which is the whole idea:
+   the accent colour is not a brand choice, it is what is behind the card. */
+.card-field rect.on {
+  fill: var(--punch);
+  filter: drop-shadow(0 0 6px rgba(233, 151, 63, 0.65));
+}
+
+/* --- Nav ---------------------------------------------------------------- */
+
+.nav {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 1.6rem 1.5rem;
+}
+
+.wordmark {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.nav nav {
+  display: flex;
+  gap: 1.5rem;
+  margin-left: auto;
+  font-size: 13.5px;
+  color: var(--dim);
+}
+.nav nav a:hover {
+  color: var(--text);
+}
+
+.signin {
+  font-size: 13.5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.35rem 0.9rem;
+  transition: border-color 150ms;
+}
+.signin:hover {
+  border-color: var(--punch);
+}
+
+@media (max-width: 640px) {
+  .nav nav {
+    display: none;
+  }
+}
+
+/* --- Hero --------------------------------------------------------------- */
+
+main {
+  position: relative;
+  z-index: 1;
+}
+
+.hero {
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 3.5rem 1.5rem 0;
+  text-align: center;
+}
+
+.hero h1 {
+  /* The one place in the product where type is loud. Tight tracking and a
+     short measure: a display line that wraps four times is not a display line. */
+  margin: 0;
+  font-size: clamp(2.6rem, 7vw, 5rem);
+  font-weight: 600;
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+.hero .sub {
+  max-width: 34rem;
+  margin: 1.6rem auto 0;
+  color: var(--dim);
+  text-wrap: pretty;
+}
+
+/* --- The specimen ------------------------------------------------------- */
+
+/* The product's own artifact, floating over the card the way the reference
+   floats its input. It is not a screenshot: it is the real markup at the real
+   proportions, so it cannot drift away from what the app actually draws. */
+.specimen {
+  position: relative;
+  z-index: 1;
+  max-width: 40rem;
+  /* Sits ON the card, not above it. The overlap is what makes the specimen read
+     as an object resting on a surface rather than two pictures stacked. */
+  margin: 4.5rem auto 0;
+  text-align: left;
+  background: rgba(15, 17, 21, 0.82);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 1rem 1.25rem 1.25rem;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 30px 70px -30px rgba(0, 0, 0, 0.9);
+}
+
+.specimen-head {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.clock {
+  font: 500 26px/1 var(--mono);
+  letter-spacing: -0.02em;
+  color: var(--punch);
+  font-variant-numeric: tabular-nums;
+}
+
+.specimen-note {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.specimen-note b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.stop {
+  background: var(--punch);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 4px;
+  padding: 0.25rem 0.7rem;
+}
+
+.specimen-day {
+  padding-top: 0.9rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 13px;
+}
+
+.hour {
+  width: 1.2rem;
+  font: 400 10px/1 var(--mono);
+  color: var(--faint);
+}
+
+.band {
+  width: 3px;
+  height: 1.1rem;
+  border-radius: 2px;
+  background: #343943;
+}
+.band.dashed {
+  background: none;
+  border: 1px dashed #343943;
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.label i {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--dim);
+}
+.label.muted {
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.dur {
+  font: 400 11px/1 var(--mono);
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.record {
+  font-size: 11px;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+}
+
+.punches {
+  display: flex;
+  gap: 0.28rem;
+  padding: 0.15rem 0 0.55rem 3.6rem;
+}
+.punches i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid #4a3616;
+}
+.punches i.filled {
+  background: var(--punch);
+  border-color: var(--punch);
+}
+
+/* --- Sections ----------------------------------------------------------- */
+
+.strip {
+  position: relative;
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 6.5rem 1.5rem 0;
+}
+
+.eyebrow {
+  margin: 0 0 1.5rem;
+  font: 500 11px/1 var(--sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.strip h2 {
+  margin: 0;
+  font-size: clamp(1.6rem, 3.2vw, 2.3rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+.strip h2.wide {
+  max-width: 22ch;
+}
+
+.strip p {
+  color: var(--dim);
+  text-wrap: pretty;
+}
+
+.lede {
+  max-width: 46ch;
+  margin-top: 1rem;
+}
+
+/* Asymmetric on purpose. Two equal columns is the layout every generated page
+   arrives in; here the claim is narrow and the evidence is wide, because the
+   evidence is the point. */
+.two {
+  display: grid;
+  gap: 3rem;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 5fr);
+  align-items: start;
+}
+.two h2 {
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 780px) {
+  .two {
+    grid-template-columns: 1fr;
+  }
+}
+
+.proof {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1.1rem 1.25rem;
+  background: rgba(15, 17, 21, 0.6);
+}
+.proof-line {
+  display: flex;
+  gap: 0.9rem;
+  padding: 0.42rem 0;
+  font-size: 13px;
+  color: var(--dim);
+  border-bottom: 1px solid var(--line);
+}
+.proof-line:last-of-type {
+  border-bottom: 0;
+}
+.sha {
+  font: 400 12px/1.5 var(--mono);
+  color: var(--punch);
+}
+.proof-foot {
+  margin: 0.8rem 0 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.three {
+  display: grid;
+  gap: 2.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.three h3 {
+  margin: 0 0 0.6rem;
+  font-size: 14px;
+  font-weight: 600;
+}
+.three p {
+  margin: 0;
+  font-size: 13.5px;
+}
+.three pre {
+  margin: 0;
+  overflow-x: auto;
+}
+.three code {
+  font: 400 12px/1.8 var(--mono);
+  color: var(--dim);
+  white-space: pre;
+}
+
+@media (max-width: 780px) {
+  .three {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+}
+
+.close {
+  padding-bottom: 7rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 2rem;
+}
+.cta {
+  border-radius: 6px;
+  padding: 0.6rem 1.3rem;
+  font-size: 13.5px;
+  font-weight: 500;
+  background: var(--punch);
+  color: var(--ink);
+  transition: filter 150ms, transform 150ms;
+}
+.cta:hover {
+  filter: brightness(1.1);
+}
+.cta:active {
+  transform: scale(0.98);
+}
+.cta.ghost {
+  background: none;
+  color: var(--dim);
+  border: 1px solid var(--line);
+}
+.cta.ghost:hover {
+  color: var(--text);
+  border-color: var(--faint);
+}
+
+footer {
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 1.5rem;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+footer nav {
+  display: flex;
+  gap: 1.2rem;
+  margin-left: auto;
+}
+footer a:hover {
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}

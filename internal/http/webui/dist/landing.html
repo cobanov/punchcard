@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>punchcard — time tracking that shows its work</title>
+    <meta
+      name="description"
+      content="Start a timer. When you stop, punchcard attaches the commits you pushed while it ran. Open source, self-hostable."
+    />
+    <meta property="og:title" content="punchcard" />
+    <meta property="og:description" content="Time tracking that shows its work." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://punchcard.cobanov.run" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c0d10'/%3E%3Crect x='8' y='9' width='4' height='6' rx='1' fill='%23e9973f'/%3E%3Crect x='14' y='9' width='4' height='6' rx='1' fill='%23343943'/%3E%3Crect x='20' y='9' width='4' height='6' rx='1' fill='%23e9973f'/%3E%3Crect x='8' y='18' width='4' height='6' rx='1' fill='%23343943'/%3E%3Crect x='14' y='18' width='4' height='6' rx='1' fill='%23e9973f'/%3E%3Crect x='20' y='18' width='4' height='6' rx='1' fill='%23343943'/%3E%3C/svg%3E"
+    />
+    <script type="module" crossorigin src="/assets/landing-CpsKnfDV.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/modulepreload-polyfill-B5Qt9EMX.js">
+    <link rel="stylesheet" crossorigin href="/assets/landing-Ct5GiFgI.css">
+  </head>
+  <body class="landing">
+    <a href="#what" class="skip">Skip to content</a>
+
+    <!-- The card itself, at scale, receding into the dark. Every other product
+         page in this category puts a photograph here — a planet, a city, a
+         desk. This is the object the product is named after, drawn rather than
+         photographed, and the light through its punches is where the one accent
+         colour in the whole product comes from.
+
+         It is contained to the top of the page rather than left running behind
+         everything: a field bright enough to be an image is a field too bright
+         to read body copy over. -->
+    <div class="top">
+      <div class="card-field" aria-hidden="true"><svg id="field" preserveAspectRatio="xMidYMax slice"></svg></div>
+
+      <header class="nav">
+      <a href="/" class="wordmark">punchcard</a>
+      <nav>
+        <a href="#what">How it works</a>
+        <a href="#recover">Recovery</a>
+        <a href="/docs">API</a>
+      </nav>
+      <a href="/app" class="signin">Sign in</a>
+    </header>
+
+      <section class="hero">
+        <h1>
+          Time tracking<br />
+          that shows its work.
+        </h1>
+        <p class="sub">
+          Start a timer, say what you are doing, stop it. punchcard attaches the commits you
+          pushed while it ran — so the record is not a number you typed, it is what happened.
+        </p>
+
+        <!-- The product's own artifact, floating over the field the way the
+             reference floats its input box. Real markup, real proportions: this
+             is what the app draws. -->
+        <div class="specimen">
+          <div class="specimen-head">
+            <span class="clock">01:42:07</span>
+            <span class="specimen-note"><b>capsarsiv</b> · comment system refactor</span>
+            <span class="stop">Stop</span>
+          </div>
+          <div class="specimen-day">
+            <div class="row">
+              <span class="hour">09</span>
+              <span class="band"></span>
+              <span class="label">capsarsiv <i>feed query</i></span>
+              <span class="dur">1h 48m</span>
+            </div>
+            <div class="punches">
+              <i class="filled"></i><i class="filled"></i><i class="filled"></i>
+            </div>
+            <div class="row">
+              <span class="hour">11</span>
+              <span class="band"></span>
+              <span class="label">helva <i>webhook retry</i></span>
+              <span class="dur">2h 15m</span>
+            </div>
+            <div class="punches">
+              <i class="filled"></i><i class="filled"></i><i class="filled"></i><i class="filled"></i>
+              <i class="filled"></i><i class="filled"></i><i class="filled"></i>
+            </div>
+            <div class="row unmatched">
+              <span class="hour">14</span>
+              <span class="band dashed"></span>
+              <span class="label muted">no timer was running</span>
+              <span class="record">Record this</span>
+            </div>
+            <div class="punches">
+              <i></i><i></i><i></i><i></i>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <main>
+      <section id="what" class="strip">
+        <p class="eyebrow">What it does</p>
+        <div class="two">
+          <div>
+            <h2>The commits come with the hours.</h2>
+            <p>
+              Every tracker can tell you that Tuesday had six hours in it. punchcard tells you
+              which commits happened inside them, in which repositories, on which branches —
+              including the branch you were actually working on, which is the part most
+              integrations quietly miss.
+            </p>
+          </div>
+          <div class="proof">
+            <div class="proof-line"><span class="sha">5bcf877</span> module path renamed</div>
+            <div class="proof-line"><span class="sha">e279aeb</span> pin the signing certificate</div>
+            <div class="proof-line"><span class="sha">638cb0a</span> release config follows the rename</div>
+            <div class="proof-line"><span class="sha">970eaf5</span> say what a reviewer needs</div>
+            <p class="proof-foot">4 of 12 commits · 5 repositories · nothing configured</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="recover" class="strip">
+        <p class="eyebrow">When you forget</p>
+        <h2 class="wide">A timer you forgot to start is not lost work.</h2>
+        <p class="lede">
+          The commits are already there and already timestamped. punchcard shows them as
+          punches with no card around them, and turns them into a record when you say so.
+          That is a better answer than guessing at idle time, because the evidence is real.
+        </p>
+      </section>
+
+      <section class="strip">
+        <p class="eyebrow">Where it runs</p>
+        <div class="three">
+          <div>
+            <h3>Terminal</h3>
+            <pre><code>punchcard start caps "refactor"
+punchcard stop
+punchcard today</code></pre>
+          </div>
+          <div>
+            <h3>Menu bar</h3>
+            <p>A macOS app that keeps the running timer in view and tells you when one has been running for eight hours.</p>
+          </div>
+          <div>
+            <h3>Browser</h3>
+            <p>The full picture: the day, projects and rates, reports, and the commits behind all of it.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="strip close">
+        <h2 class="wide">Yours to run.</h2>
+        <p class="lede">
+          MIT licensed. One Go binary and a Postgres — the hosted instance and a self-hosted
+          one are the same build.
+        </p>
+        <div class="actions">
+          <a href="/app" class="cta">Start tracking</a>
+          <a href="/docs" class="cta ghost">Read the API</a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>punchcard</span>
+      <nav>
+        <a href="/docs">API</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="https://github.com/cobanov/punchcard">Source</a>
+      </nav>
+    </footer>
+  </body>
+</html>

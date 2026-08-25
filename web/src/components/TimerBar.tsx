@@ -6,12 +6,11 @@ import { clock, elapsed, hhmm } from "../lib/format";
  * The one control that matters.
  *
  * It never leaves the screen, because starting and stopping is what people open
- * punchcard to do. Everything else on the page is something you look at; this is
- * the thing you press.
+ * punchcard to do. Everything else on the page is read; this is pressed.
  *
- * Starting takes two fields and one key. The project remembers what you used
- * last, so most days you type a sentence and press Enter. Rate, client and
- * repositories are not here — they were settled once, on the project.
+ * The running clock is the only large thing in the interface. In a tool where
+ * every other number is 11 or 13px, one element at 28px with tight tracking is
+ * the whole hierarchy — and it should be the number that is actually moving.
  */
 
 interface Props {
@@ -26,31 +25,28 @@ interface Props {
 export function TimerBar({ current, projects, projectName, onStart, onStop, busy }: Props) {
   const [note, setNote] = useState("");
   const [projectID, setProjectID] = useState("");
-  const [tick, setTick] = useState(0);
+  const [, setTick] = useState(0);
   const noteRef = useRef<HTMLInputElement>(null);
 
-  // The running clock ticks locally. The data behind it refreshes on its own
-  // schedule; a timer that only moved when the network answered would look
-  // broken every time the network was slow.
+  // The clock ticks locally. A timer that only moved when the network answered
+  // would look broken every time the network was slow.
   useEffect(() => {
     if (!current?.running) return;
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, [current?.running]);
-  void tick;
 
-  // Default to the most recently used project — nine times in ten it is the
-  // right one, and picking it again is friction for nothing.
   useEffect(() => {
     if (!projectID && projects.length) setProjectID(projects[0]!.id);
   }, [projects, projectID]);
 
-  // `n` focuses the note from anywhere, the way a keyboard-driven tool should.
+  // `n` focuses the note from anywhere. A tool people live in should be
+  // reachable without the mouse.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
-      if (!typing && e.key === "n") {
+      const tag = (e.target as HTMLElement).tagName;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+      if (e.key === "n") {
         e.preventDefault();
         noteRef.current?.focus();
       }
@@ -61,65 +57,65 @@ export function TimerBar({ current, projects, projectName, onStart, onStop, busy
 
   if (current?.running) {
     return (
-      <div className="flex items-center gap-4 rounded-lg border border-line bg-card px-4 py-3">
-        <span className="font-mono text-lg font-medium tabular-nums text-punch">
+      <section
+        aria-label="Running timer"
+        className="flex items-center gap-4 border-b border-line pb-4"
+      >
+        <span className="tnum font-mono text-[28px] font-medium leading-none tracking-tight text-punch">
           {clock(elapsed(current))}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate">
+          <p className="truncate">
             <span className="font-medium">{projectName(current.project_id)}</span>
-            <span className="text-dim"> · {current.note || "—"}</span>
-          </div>
-          <div className="font-mono text-[11px] text-faint">since {hhmm(current.started_at)}</div>
+            {current.note && <span className="text-dim"> · {current.note}</span>}
+          </p>
+          <p className="tnum font-mono text-[11px] text-faint">since {hhmm(current.started_at)}</p>
         </div>
-        <button
-          onClick={onStop}
-          disabled={busy}
-          className="rounded-md bg-punch px-4 py-2 font-medium text-ink transition hover:brightness-110 disabled:opacity-50"
-        >
+        <button onClick={onStop} disabled={busy} className="btn-primary px-3 py-1.5">
           Stop
         </button>
-      </div>
+      </section>
     );
   }
 
   return (
-    <form
-      onSubmit={async (e) => {
-        e.preventDefault();
-        if (!projectID) return;
-        await onStart(projectID, note.trim());
-        setNote("");
-      }}
-      className="flex items-center gap-2 rounded-lg border border-line bg-card px-2 py-2"
-    >
-      <input
-        ref={noteRef}
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder="What are you working on?"
-        aria-label="What are you working on?"
-        className="min-w-0 flex-1 bg-transparent px-2 py-1.5 outline-none placeholder:text-faint"
-      />
-      <select
-        value={projectID}
-        onChange={(e) => setProjectID(e.target.value)}
-        aria-label="Project"
-        className="max-w-[12rem] rounded-md bg-raise px-2 py-1.5 text-text outline-none"
+    <section aria-label="Start a timer" className="border-b border-line pb-4">
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!projectID) return;
+          await onStart(projectID, note.trim());
+          setNote("");
+        }}
+        className="flex items-center gap-2"
       >
-        {projects.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-      <button
-        type="submit"
-        disabled={busy || !projectID}
-        className="rounded-md bg-punch px-4 py-1.5 font-medium text-ink transition hover:brightness-110 disabled:opacity-50"
-      >
-        Start
-      </button>
-    </form>
+        <input
+          ref={noteRef}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="What are you working on?"
+          aria-label="What are you working on?"
+          className="min-w-0 flex-1 bg-transparent py-1 text-[15px] outline-none placeholder:text-faint"
+        />
+        <kbd className="hidden shrink-0 rounded border border-line px-1 font-mono text-[10px] text-faint sm:block">
+          n
+        </kbd>
+        <select
+          value={projectID}
+          onChange={(e) => setProjectID(e.target.value)}
+          aria-label="Project"
+          className="field max-w-[11rem]"
+        >
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <button type="submit" disabled={busy || !projectID} className="btn-primary px-3 py-1.5">
+          Start
+        </button>
+      </form>
+    </section>
   );
 }
