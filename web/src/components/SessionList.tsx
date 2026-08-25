@@ -1,6 +1,15 @@
-import { useEffect, useState } from "react";
-import { api, type AgentRun, type Cluster, type Commit, type Project, type Session } from "../lib/api";
-import { firstLine, hhmm, total, workKey, workLabel } from "../lib/format";
+import { useState } from "react";
+import {
+  api,
+  type Cluster,
+  type Commit,
+  type Project,
+  type Session,
+  type SessionAllocation,
+  type SessionAttributionT,
+  type UnresolvedPlace,
+} from "../lib/api";
+import { firstLine, hhmm, total } from "../lib/format";
 
 /**
  * The day, as rows.
@@ -18,13 +27,17 @@ import { firstLine, hhmm, total, workKey, workLabel } from "../lib/format";
 interface Props {
   sessions: Session[];
   commits: Record<string, Commit[]>;
+  attribution: Record<string, SessionAttributionT>;
   projects: Project[];
   onSave: (id: string, body: Record<string, unknown>) => void;
   onDelete: (id: string) => void;
+  /** Reload the day — a project created from an unresolved place changes what
+   *  every other session on screen resolves to. */
+  onChanged: () => void;
   busy: boolean;
 }
 
-export function SessionList({ sessions, commits, projects, onSave, onDelete, busy }: Props) {
+export function SessionList({ sessions, commits, attribution, projects, onSave, onDelete, onChanged, busy }: Props) {
   const [open, setOpen] = useState<string | null>(null);
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? "—";
 
@@ -69,6 +82,14 @@ export function SessionList({ sessions, commits, projects, onSave, onDelete, bus
               </span>
               <span className="c-project truncate font-medium">
                 {projectName(session.project_id)}
+                {drifts(attribution[session.id], session.project_id) && (
+                  <span
+                    className="ml-1.5 t-caption text-faint"
+                    title="Evidence points to other projects — open the row"
+                  >
+                    •
+                  </span>
+                )}
               </span>
               <span className="c-note truncate text-dim">{session.note || "—"}</span>
               <CommitBadge count={own.length} syncState={session.commit_sync_state} />
@@ -108,7 +129,11 @@ export function SessionList({ sessions, commits, projects, onSave, onDelete, bus
                     ))}
                   </ul>
                 )}
-                <AgentRunList sessionID={session.id} />
+                <AttributionBlock
+                  session={session}
+                  attribution={attribution[session.id]}
+                  onChanged={onChanged}
+                />
               </div>
             )}
           </li>
@@ -421,81 +446,80 @@ function UnmatchedRow({
 }
 
 /**
- * The agent runs filed against a session, summarised.
+ * How this session's hour actually divides, and the places nobody claims.
  *
- * Fetched when the row opens rather than with the day: this is the only place
- * they appear, and loading them for every session on every day view would
- * double the requests to show something nobody had asked to see yet.
- *
- * One line per repository, not per turn. A two-hour session holds forty turns,
- * most of them a minute or two, and listing them was forty rows of noise to say
- * one thing: an agent worked here, this long. The timeline above already draws
- * the stretches; this says the total, which is the part a row in a table is for.
- *
- * They render below the commits and quieter than them, on purpose. A commit is
- * something punchcard fetched from GitHub and can prove; a run is what a local
- * hook said happened. Showing them at the same weight would claim a certainty
- * the second kind does not have — hence the word "reported", said once.
+ * This replaces a per-repository summary of agent runs: the same evidence,
+ * upgraded from grouping strings to real resolution, and now able to say WHY
+ * each project earned its minutes. Quiet and dim on purpose — a commit is
+ * proof, a derived minute is a reading of proof — and never amber, which keeps
+ * meaning running time and commit evidence.
  */
-function AgentRunList({ sessionID }: { sessionID: string }) {
-  const [runs, setRuns] = useState<AgentRun[] | null>(null);
+function AttributionBlock({
+  session,
+  attribution,
+  onChanged,
+}: {
+  session: Session;
+  attribution?: SessionAttributionT;
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  if (!attribution) return null;
+  const { allocations, unresolved } = attribution;
+  // A session whose evidence agrees with its declaration has nothing to add
+  // that the row above does not already say.
+  if (!allocations.some((a) => a.evidenced) && unresolved.length === 0) return null;
 
-  useEffect(() => {
-    let live = true;
-    void api
-      .agentRuns(sessionID)
-      .then((r) => live && setRuns(r))
-      .catch(() => live && setRuns([]));
-    return () => {
-      live = false;
-    };
-  }, [sessionID]);
+  const reasonLabel = (a: SessionAllocation) =>
+    a.reason === "linked" ? "linked" : a.reason === "name" ? "name match" : "declared, quiet";
 
-  if (!runs?.length) return null;
-
-  const groups = new Map<
-    string,
-    { label: string; tool: string; seconds: number; turns: number; model: string; from: string; to: string }
-  >();
-  for (const r of runs) {
-    const where = workLabel(r.repo, r.cwd);
-    const key = `${r.tool}|${workKey(r.repo, r.cwd)}`;
-    const g = groups.get(key);
-    if (!g) {
-      groups.set(key, {
-        label: where, tool: r.tool, seconds: r.seconds, turns: 1,
-        model: r.model ?? "", from: r.started_at, to: r.ended_at,
-      });
-      continue;
+  const createFrom = async (u: UnresolvedPlace) => {
+    setBusy(true);
+    try {
+      const p = await api.createProject({ name: u.place });
+      if (u.full_name) await api.linkRepo(p.id, u.full_name).catch(() => {});
+      onChanged();
+    } finally {
+      setBusy(false);
     }
-    g.seconds += r.seconds;
-    g.turns += 1;
-    if (r.model) g.model = r.model;
-    if (r.started_at < g.from) g.from = r.started_at;
-    if (r.ended_at > g.to) g.to = r.ended_at;
-  }
-  const rows = [...groups.values()].sort((a, b) => b.seconds - a.seconds);
+  };
 
   return (
     <div className="pt-1.5">
-      <p className="eyebrow mb-1">Reported by agents</p>
+      <p className="eyebrow mb-1">Time by evidence</p>
       <ul className="space-y-1">
-        {rows.map((g, i) => (
-          <li key={`${g.tool}-${g.label}-${i}`} className="flex items-baseline gap-2.5 t-caption text-faint">
-            <span className="shrink-0 font-mono text-dim">{g.tool}</span>
-            {g.label && <span className="min-w-0 truncate font-mono">{g.label}</span>}
-            <span className="tnum ml-auto shrink-0 font-mono">
-              {hhmm(g.from)}–{hhmm(g.to)}
+        {allocations.map((a) => (
+          <li
+            key={`${a.project_id}-${a.evidenced}`}
+            className="flex items-baseline gap-2.5 t-caption text-faint"
+          >
+            <span className={a.project_id === session.project_id ? "text-dim" : "font-medium text-dim"}>
+              {a.name}
             </span>
-            <span className="tnum shrink-0 text-dim">{total(g.seconds)}</span>
-            <span className="tnum shrink-0">
-              {g.turns} turn{g.turns === 1 ? "" : "s"}
-            </span>
+            <span className="tnum shrink-0 text-dim">{total(a.seconds)}</span>
+            <span className="shrink-0">{reasonLabel(a)}</span>
+          </li>
+        ))}
+        {unresolved.map((u) => (
+          <li key={u.place} className="flex flex-wrap items-baseline gap-2.5 t-caption text-faint">
+            <span className="font-mono">{u.place}</span>
+            <span className="tnum shrink-0">{total(u.seconds)}</span>
+            <span className="shrink-0">{u.ambiguous ? "two projects claim this" : "no project"}</span>
+            {!u.ambiguous && (
+              <button onClick={() => void createFrom(u)} disabled={busy} className="btn-bare">
+                Create “{u.place}”
+              </button>
+            )}
           </li>
         ))}
       </ul>
     </div>
   );
+}
+
+/** True when any evidenced minute resolved away from the declared project. */
+function drifts(a: SessionAttributionT | undefined, declaredProjectID: string): boolean {
+  return !!a?.allocations.some((x) => x.evidenced && x.project_id !== declaredProjectID);
 }
 
 /** "12 Aug " when the stretch is from another day; nothing when today's. */

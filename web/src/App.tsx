@@ -9,6 +9,7 @@ import {
   type GitHubStatus,
   type Project,
   type Session,
+  type SessionAttributionT,
 } from "./lib/api";
 import { addDays, dayName, daysAgo, isToday, startOfToday, toDateInput, total } from "./lib/format";
 import { DayTimeline } from "./components/DayTimeline";
@@ -35,6 +36,7 @@ export function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [commits, setCommits] = useState<Record<string, Commit[]>>({});
+  const [attribution, setAttribution] = useState<Record<string, SessionAttributionT>>({});
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [github, setGithub] = useState<GitHubStatus | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
@@ -89,6 +91,23 @@ export function App() {
           .map(async (s) => [s.id, await api.commits(s.id).catch(() => [])] as const),
       );
       setCommits(Object.fromEntries(pairs));
+
+      // Where each session's hour actually went. Same shape as the commit
+      // fetch above: per session, and one failure must not blank the day.
+      const attrPairs = await Promise.all(
+        loadedSessions
+          .filter((s) => !s.running)
+          .map(
+            async (s) =>
+              [
+                s.id,
+                await api
+                  .sessionAttribution(s.id)
+                  .catch(() => ({ allocations: [], unresolved: [] })),
+              ] as const,
+          ),
+      );
+      setAttribution(Object.fromEntries(attrPairs));
     } catch (e) {
       if (e instanceof NotSignedIn) {
         setSignedIn(false);
@@ -220,8 +239,10 @@ export function App() {
             <SessionList
               sessions={sessions}
               commits={commits}
+              attribution={attribution}
               projects={projects}
               busy={busy}
+              onChanged={() => void load()}
               onSave={(id, body) => void act(() => api.updateSession(id, body))}
               onDelete={(id) => void act(() => api.deleteSession(id))}
             />

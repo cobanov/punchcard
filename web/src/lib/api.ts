@@ -74,6 +74,26 @@ export interface AgentRun {
   tool_calls?: number;
 }
 
+export interface SessionAllocation {
+  project_id: string;
+  name: string;
+  seconds: number;
+  evidenced: boolean;
+  reason: "linked" | "name" | "declared";
+}
+
+export interface UnresolvedPlace {
+  place: string;
+  full_name?: string;
+  seconds: number;
+  ambiguous?: boolean;
+}
+
+export interface SessionAttributionT {
+  allocations: SessionAllocation[];
+  unresolved: UnresolvedPlace[];
+}
+
 export interface Cluster {
   from: string;
   to: string;
@@ -231,6 +251,13 @@ export const api = {
       (r) => r.agent_runs ?? [],
     ),
 
+  /** How a session's time divides across projects, by its evidence. */
+  sessionAttribution: (sessionID: string) =>
+    call<SessionAttributionT>(`/v1/sessions/${sessionID}/attribution`).then((r) => ({
+      allocations: r.allocations ?? [],
+      unresolved: r.unresolved ?? [],
+    })),
+
   agentRuns: (sessionID: string) =>
     call<{ agent_runs: AgentRun[] }>(`/v1/sessions/${sessionID}/agent-runs`).then(
       (r) => r.agent_runs ?? [],
@@ -266,9 +293,9 @@ export const api = {
 
   /** Per-project totals. The list is normalised to an array here so no screen
    *  further in has to defend against a range with nothing in it. */
-  summary: (from: Date, to: Date) =>
+  summary: (from: Date, to: Date, attribution: "declared" | "evidence" = "declared") =>
     call<{ projects?: ProjectTotal[]; timezone: string }>(
-      `/v1/reports/summary?${range(from, to)}&group_by=project`,
+      `/v1/reports/summary?${range(from, to)}&group_by=project&attribution=${attribution}`,
     ).then((r) => ({ ...r, projects: r.projects ?? [] })),
 
   /** Per-day totals, bucketed in the account's timezone by the server. */
