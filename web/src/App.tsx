@@ -295,11 +295,17 @@ function StatsStrip({
 function DayNav({ day, onChange }: { day: Date; onChange: (d: Date) => void }) {
   const today = isToday(day);
   return (
-    <header className="flex items-center gap-1.5 border-b border-line px-2 py-1.5">
+    // px-3 and py-2, the same as the table rows below, so this bar starts and
+    // ends on the same two vertical lines the columns do. The first chevron
+    // then pulls its own padding back out with -ml-1.5: the padding is the
+    // click target and should stay, but it was pushing the glyph two pixels
+    // past where TIME begins, which is exactly the kind of two pixels that
+    // reads as "crooked" without being nameable.
+    <header className="flex items-center gap-1.5 border-b border-line px-3 py-2">
       <button
         onClick={() => onChange(addDays(day, -1))}
         aria-label="Previous day"
-        className="btn-bare px-1.5 t-lead leading-none"
+        className="btn-bare -ml-1.5 px-1.5 t-body leading-none"
       >
         ‹
       </button>
@@ -307,7 +313,7 @@ function DayNav({ day, onChange }: { day: Date; onChange: (d: Date) => void }) {
         onClick={() => onChange(addDays(day, 1))}
         disabled={today}
         aria-label="Next day"
-        className="btn-bare px-1.5 t-lead leading-none disabled:opacity-30"
+        className="btn-bare px-1.5 t-body leading-none disabled:opacity-30"
       >
         ›
       </button>
@@ -320,13 +326,13 @@ function DayNav({ day, onChange }: { day: Date; onChange: (d: Date) => void }) {
           if (e.target.value) onChange(new Date(`${e.target.value}T00:00:00`));
         }}
         aria-label="Go to date"
-        className="field border-0 bg-transparent py-0.5 font-mono t-body text-dim"
+        className="field border-0 bg-transparent px-1 py-0.5 font-mono t-body text-dim"
       />
       <span className="t-body font-medium text-text">
         {today ? "Today" : dayName(day)}
       </span>
       {!today && (
-        <button onClick={() => onChange(startOfToday())} className="btn-ghost ml-auto py-0.5 t-caption">
+        <button onClick={() => onChange(startOfToday())} className="btn-ghost -mr-1 ml-auto py-0.5 t-caption">
           Today
         </button>
       )}
