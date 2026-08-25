@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { api, type Project, type Repo } from "../lib/api";
 import { money } from "../lib/format";
-import { COLOR_NAMES, PALETTE, projectColor } from "../lib/palette";
+import { assignColors, COLOR_NAMES, PALETTE, projectColor } from "../lib/palette";
 
 /**
  * Projects: what time is booked against.
@@ -21,6 +21,9 @@ import { COLOR_NAMES, PALETTE, projectColor } from "../lib/palette";
 export function Projects({ projects, onChange }: { projects: Project[]; onChange: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Assigned across the whole list, so two projects that hash to the same
+  // colour do not both wear it.
+  const colors = assignColors(projects);
 
   const run = async (work: () => Promise<unknown>) => {
     try {
@@ -65,7 +68,7 @@ export function Projects({ projects, onChange }: { projects: Project[]; onChange
                 >
                   <span
                     className="size-2 shrink-0 rounded-full"
-                    style={{ background: projectColor(project.color, project.id) }}
+                    style={{ background: colors.get(project.id) }}
                     aria-hidden
                   />
                   <span className="truncate font-medium transition-colors hover:text-punch">

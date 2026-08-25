@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { api, type ProjectTotal } from "../lib/api";
 import { money, total } from "../lib/format";
-import { projectColor } from "../lib/palette";
+import { assignColors } from "../lib/palette";
 
 /**
  * Analytics: what happened, and whether it is more or less than before.
@@ -386,6 +386,7 @@ function Breakdown({
   projects: ProjectTotal[];
   totalSeconds: number;
 }) {
+  const colors = assignColors(projects.map((p) => ({ id: p.project_id, color: p.color })));
   return (
     <section
       className="panel overflow-hidden"
@@ -409,7 +410,7 @@ function Breakdown({
                 <span className="flex min-w-0 items-center gap-2">
                   <span
                     className="size-2 shrink-0 rounded-full"
-                    style={{ background: projectColor(p.color, p.project_id) }}
+                    style={{ background: colors.get(p.project_id) }}
                     aria-hidden
                   />
                   <span className="truncate font-medium">{p.name}</span>
@@ -433,7 +434,7 @@ function Breakdown({
                   className="h-full rounded-full"
                   style={{
                     width: `${share}%`,
-                    background: projectColor(p.color, p.project_id),
+                    background: colors.get(p.project_id),
                     opacity: 0.8,
                   }}
                 />
