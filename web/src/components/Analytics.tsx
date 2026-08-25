@@ -135,7 +135,12 @@ export function Analytics({ timezone }: { timezone: string }) {
     setRange((r) => (r.key === "custom" ? r : presetRange(r.key, timezone)));
   }, [timezone]);
 
-  const load = useCallback(async (r: Range) => {
+  // "evidence" is the default here even though the API defaults to
+  // "declared": the API keeps old clients' numbers stable, the app shows the
+  // truthful split. The switch exists for anyone who wants the timer's story.
+  const [mode, setMode] = useState<"evidence" | "declared">("evidence");
+
+  const load = useCallback(async (r: Range, m: "evidence" | "declared") => {
     setData(null);
     setError(null);
     try {
@@ -145,9 +150,9 @@ export function Analytics({ timezone }: { timezone: string }) {
       const prevFrom = new Date(r.from.getTime() - span);
 
       const [summary, days, previous] = await Promise.all([
-        api.summary(r.from, r.to),
+        api.summary(r.from, r.to, m),
         api.summaryDays(r.from, r.to),
-        api.summary(prevFrom, r.from),
+        api.summary(prevFrom, r.from, m),
       ]);
       setData({
         projects: summary.projects,
@@ -162,12 +167,34 @@ export function Analytics({ timezone }: { timezone: string }) {
   }, []);
 
   useEffect(() => {
-    void load(range);
-  }, [range, load]);
+    void load(range, mode);
+  }, [range, mode, load]);
 
   return (
     <div className="space-y-4">
-      <RangePicker timezone={timezone} range={range} onChange={setRange} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <RangePicker timezone={timezone} range={range} onChange={setRange} />
+        <div
+          className="flex gap-0.5 rounded-lg border border-line bg-card p-0.5"
+          role="group"
+          aria-label="Attribution"
+        >
+          {(["evidence", "declared"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              aria-pressed={mode === m}
+              className={
+                mode === m
+                  ? "rounded-md bg-raise px-2.5 py-1 text-text"
+                  : "rounded-md px-2.5 py-1 text-dim transition-colors hover:text-text"
+              }
+            >
+              {m === "evidence" ? "By evidence" : "As declared"}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {error && (
         <p className="rounded-md border-l-2 border-punch bg-card px-3 py-2 text-dim">{error}</p>
@@ -176,7 +203,7 @@ export function Analytics({ timezone }: { timezone: string }) {
       {data === null ? (
         <Skeleton />
       ) : (
-        <Loaded data={data} range={range} onRefresh={() => void load(range)} />
+        <Loaded data={data} range={range} mode={mode} onRefresh={() => void load(range, mode)} />
       )}
     </div>
   );
@@ -185,10 +212,12 @@ export function Analytics({ timezone }: { timezone: string }) {
 function Loaded({
   data,
   range,
+  mode,
   onRefresh,
 }: {
   data: Data;
   range: Range;
+  mode: "evidence" | "declared";
   onRefresh: () => void;
 }) {
   const seconds = data.projects.reduce((sum, p) => sum + p.seconds, 0);
@@ -241,11 +270,19 @@ function Loaded({
           Updated {data.fetchedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} ·
           days cut in {data.timezone}
         </span>
+        {/* A number whose method is a secret is the thing this whole feature
+            exists to end, so the method is on screen next to the number. */}
+        <span className="t-caption text-faint">
+          ·{" "}
+          {mode === "evidence"
+            ? "each minute goes to the project whose evidence was active; shared minutes split evenly; quiet minutes follow the timer"
+            : "every minute follows the timer's declared project"}
+        </span>
         <button onClick={onRefresh} className="btn-bare t-caption">
           Refresh
         </button>
         <a
-          href={`/v1/reports/export.csv?from=${encodeURIComponent(range.from.toISOString())}&to=${encodeURIComponent(range.to.toISOString())}`}
+          href={`/v1/reports/export.csv?from=${encodeURIComponent(range.from.toISOString())}&to=${encodeURIComponent(range.to.toISOString())}&attribution=${mode}`}
           className="btn-bare t-caption ml-auto"
         >
           Download CSV
