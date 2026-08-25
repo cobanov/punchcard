@@ -67,7 +67,7 @@ export function Analytics() {
       ]);
       setData({
         projects: summary.projects,
-        days,
+        days: fillCalendar(days, r, summary.timezone),
         previousSeconds: previous.projects.reduce((sum, p) => sum + p.seconds, 0),
         timezone: summary.timezone,
         fetchedAt: new Date(),
@@ -144,7 +144,7 @@ function Loaded({
         <Metric
           label="Days worked"
           value={String(activeDays)}
-          hint={`of ${data.days.length || dayCount(range)} in range`}
+          hint={`of ${data.days.length} in range`}
         />
       </div>
 
@@ -446,8 +446,51 @@ function Skeleton() {
   );
 }
 
-const dayCount = (r: Range) =>
-  Math.max(1, Math.round((r.to.getTime() - r.from.getTime()) / 864e5));
+/**
+ * Turn the server's sparse answer into a calendar.
+ *
+ * `group_by=day` returns the days that have work in them — a quiet Tuesday is
+ * simply absent. Two screens read that list as if it were the range itself,
+ * and both were wrong in a way that looked plausible: "days worked" divided by
+ * the rows it was counting and could only ever say "1 of 1", and the chart
+ * plotted the returned rows side by side, so a week with Monday and Friday in
+ * it drew two adjacent bars and hid the three empty days between them.
+ *
+ * A day with no work is data. It gets a row, with zero in it.
+ *
+ * Steps are twelve hours, not twenty-four: a daylight-saving day is 23 or 25
+ * hours long, and a 24-hour step across one either skips a date or repeats it.
+ * Sampling twice a day and deduping by the formatted key cannot miss one. The
+ * keys are formatted in the ACCOUNT's zone, the same zone the server cut its
+ * days in — formatting in the browser's zone would shift every label for
+ * anyone travelling.
+ */
+function fillCalendar(
+  rows: { date: string; seconds: number }[],
+  range: Range,
+  timezone: string,
+): { date: string; seconds: number }[] {
+  // en-CA formats as YYYY-MM-DD, which is the shape the server already sends.
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const worked = new Map(rows.map((r) => [r.date, r.seconds]));
+  const out: { date: string; seconds: number }[] = [];
+  const seen = new Set<string>();
+  // `to` is exclusive everywhere in this file — the presets end at the start of
+  // TOMORROW — so the loop stops before it, or every range gains a day it does
+  // not contain.
+  for (let t = range.from.getTime(); t < range.to.getTime(); t += 12 * 3600 * 1000) {
+    const key = fmt.format(new Date(t));
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ date: key, seconds: worked.get(key) ?? 0 });
+  }
+  return out;
+}
 
 /** "25 Aug" from the server's YYYY-MM-DD, parsed as a local date so the label
  *  cannot slip a day. */
