@@ -109,6 +109,12 @@ func (d *Domain) ScanWindow(ctx context.Context, userID uuid.UUID, from, to time
 		byName[r.FullName] = repoRef{id: &id, branches: cached}
 	}
 	if len(byName) == 0 {
+		// Nothing was pushed in this window, so there is nothing to look in.
+		// The scan still HAPPENED, and recording that matters: without it
+		// last_scan_at stays null and every client reports "never scanned",
+		// which reads as broken to a user whose integration is working fine and
+		// simply had a quiet morning.
+		d.touchScan(ctx, userID)
 		return res, nil
 	}
 
@@ -148,10 +154,15 @@ func (d *Domain) ScanWindow(ctx context.Context, userID uuid.UUID, from, to time
 		res.Attached += attached
 	}
 
+	d.touchScan(ctx, userID)
+	return res, nil
+}
+
+// touchScan records that a scan completed, clearing any previous error.
+func (d *Domain) touchScan(ctx context.Context, userID uuid.UUID) {
 	if err := d.store.TouchGitHubScan(ctx, userID); err != nil {
 		d.log.WarnContext(ctx, "could not record scan time", "error", err.Error())
 	}
-	return res, nil
 }
 
 // permanentGitHubError marks a failure the backoff must not retry.

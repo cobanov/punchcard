@@ -653,3 +653,29 @@ func TestDiscoveryIgnoresRepositoriesNotPushedSinceTheWindow(t *testing.T) {
 		t.Fatal("a repository with no pushes since the window began should never be fetched")
 	}
 }
+
+// A quiet window is still a scan.
+//
+// Without recording it, last_scan_at stays null and every client reports "never
+// scanned" — which reads as a broken integration to someone whose integration
+// is fine and simply pushed nothing that hour.
+func TestAQuietWindowStillRecordsTheScan(t *testing.T) {
+	e, _ := newGitHubEnv(t)
+	p := e.newUser(t)
+	if err := e.d.ConnectGitHub(e.ctx, p, "cobanov", "ghp_secret_value", GitHubScope); err != nil {
+		t.Fatalf("connect github: %v", err)
+	}
+	proj := e.mustProject(t, p, "p")
+	ws := e.seedSession(t, p, proj.ID, at("10:00"), at("12:00")) // nothing pushed
+
+	if _, err := e.d.ScanWindow(e.ctx, p.UserID, ws.StartedAt, *ws.EndedAt); err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	st, err := e.d.GitHubStatus(e.ctx, p)
+	if err != nil {
+		t.Fatalf("status: %v", err)
+	}
+	if st.LastScanAt == nil {
+		t.Fatal("a scan that found nothing to look in is still a scan that ran")
+	}
+}
