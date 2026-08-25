@@ -1,9 +1,10 @@
 # Project attribution — the design
 
-**Status:** designed 2026-08-25 against
-[`2026-08-25-project-attribution-problem.md`](2026-08-25-project-attribution-problem.md);
-awaiting user review. Read that document first — this one answers it and does
-not restate its evidence.
+**Status:** approved by Cobanov 2026-08-25; phases 1–2 implemented (see
+`docs/superpowers/plans/2026-08-25-project-attribution.md`). Phase 3 (places,
+strip tinting) not yet started. Read
+[`2026-08-25-project-attribution-problem.md`](2026-08-25-project-attribution-problem.md)
+first — this one answers it and does not restate its evidence.
 
 ---
 

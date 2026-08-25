@@ -97,6 +97,29 @@ TIME, so the scanner never needed telling where to look, only when.
 What linking is actually for: suggesting which project a stretch of unmatched
 commits belongs to.
 
+### Time decides containment; evidence decides labeling
+
+`SessionCovering` and the run reconciler decide WHICH SESSION holds a piece of
+evidence, by time alone — unchanged, and still resting on the one-open-session
+index. Which PROJECT a report bills a minute to is a separate, derived answer:
+`internal/service/attribution.go` resolves each piece of evidence through a
+ladder (exact repo link → link by last path segment → project of the same name
+→ nobody) and partitions the session's wall-clock accordingly at read time. The
+declaration is the fallback for quiet and unclaimed minutes and is never
+overwritten. `?attribution=declared` is the API default; the web app sends
+`evidence`.
+
+This exists because half of one real instance's commits were filed under a
+project with nothing to do with them — the evidence knew where it belonged and
+nothing ever asked it. See
+`docs/superpowers/specs/2026-08-25-project-attribution-problem.md`.
+
+Do not "fix" a mis-labeled report by rewriting session rows. Link the place or
+rename the project — reports are living views over the current project set, and
+the CSV export is the freezing mechanism. And keep the sweep exact: it works in
+microseconds because session boundaries carry deliberate microsecond nudges, and
+its allocations must sum to the clipped duration to the second.
+
 ### GitHub's commit listing only sees the default branch
 
 `GET /repos/{o}/{r}/commits` with no `sha` parameter walks the default branch and

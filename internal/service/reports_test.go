@@ -148,7 +148,7 @@ func TestExportSkipsTheRunningSession(t *testing.T) {
 	e.mustStart(t, p, proj.ID, "hâlâ çalışıyor")
 
 	var buf bytes.Buffer
-	if err := e.d.ExportCSV(e.ctx, p, at("00:00"), at("23:00"), &buf); err != nil {
+	if err := e.d.ExportCSV(e.ctx, p, at("00:00"), at("23:00"), "declared", &buf); err != nil {
 		t.Fatalf("export: %v", err)
 	}
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
