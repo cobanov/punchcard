@@ -29,7 +29,10 @@ tools: ## Install pinned dev tools into $GOPATH/bin
 	go install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 	go install github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION)
 
-.PHONY: build
+# Not optional: there is a DIRECTORY called web/, so without this make treats
+# the target as an existing file with no prerequisites and reports "up to date"
+# without ever building — the stale-bundle trap below, arriving by a side door.
+.PHONY: web
 web: ## Build the web app into internal/http/webui/dist (commit the result)
 # The binary serves the EMBEDDED dist, not web/dist. After a frontend change you
 # must run this AND restart the server, or you will be looking at the previous

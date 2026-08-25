@@ -1251,10 +1251,7 @@
             "items": {
               "$ref": "#/components/schemas/DayTotalDTO"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "from": {
             "type": "string"
@@ -1263,10 +1260,7 @@
             "items": {
               "$ref": "#/components/schemas/ProjectTotalDTO"
             },
-            "type": [
-              "array",
-              "null"
-            ]
+            "type": "array"
           },
           "timezone": {
             "type": "string"

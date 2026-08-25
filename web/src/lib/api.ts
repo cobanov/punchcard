@@ -229,10 +229,12 @@ export const api = {
    *  a page load. */
   logout: () => call<unknown>("/v1/auth/logout", { method: "POST", body: {} }),
 
+  /** Per-project totals. The list is normalised to an array here so no screen
+   *  further in has to defend against a range with nothing in it. */
   summary: (from: Date, to: Date) =>
-    call<{ projects: ProjectTotal[]; timezone: string }>(
+    call<{ projects?: ProjectTotal[]; timezone: string }>(
       `/v1/reports/summary?${range(from, to)}&group_by=project`,
-    ),
+    ).then((r) => ({ ...r, projects: r.projects ?? [] })),
 
   /** Per-day totals, bucketed in the account's timezone by the server. */
   summaryDays: (from: Date, to: Date) =>

@@ -257,3 +257,32 @@ func TestSSECarriesOnlyTheAccountsOwnEvents(t *testing.T) {
 		t.Fatal("bob received alice's event")
 	}
 }
+
+// An empty range still answers with a list.
+//
+// The summary used to drop the key entirely when nothing matched, so a quiet
+// week and a grouping that was never requested looked identical on the wire.
+// The analytics screen compares a range against the one before it, and the
+// first user whose previous week was empty got a crash instead of a zero.
+func TestEmptyRangeStillReturnsAList(t *testing.T) {
+	srv, _ := newAuthTestServer(t)
+	base := srv.URL
+	c, _ := registerActor(t, base, "quiet@example.com")
+
+	// A window that closed before the account existed: nothing can be in it.
+	to := time.Now().UTC().Add(-48 * time.Hour)
+	from := to.Add(-24 * time.Hour)
+	q := "?from=" + from.Format(time.RFC3339) + "&to=" + to.Format(time.RFC3339)
+
+	code, body := do(t, c, http.MethodGet, base+"/v1/reports/summary"+q+"&group_by=project", nil, nil)
+	must(t, "empty project summary", code, http.StatusOK)
+	if !strings.Contains(string(body), `"projects":[]`) {
+		t.Fatalf("empty project summary omitted the list: %s", body)
+	}
+
+	code, body = do(t, c, http.MethodGet, base+"/v1/reports/summary"+q+"&group_by=day", nil, nil)
+	must(t, "empty day summary", code, http.StatusOK)
+	if !strings.Contains(string(body), `"days":[]`) {
+		t.Fatalf("empty day summary omitted the list: %s", body)
+	}
+}

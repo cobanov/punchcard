@@ -35,11 +35,16 @@ func (d Deps) registerReportRoutes(api huma.API) {
 		GroupBy string `query:"group_by" enum:"project,day" default:"project"`
 	}) (*struct {
 		Body struct {
-			From     string            `json:"from"`
-			To       string            `json:"to"`
-			Timezone string            `json:"timezone"`
-			Projects []ProjectTotalDTO `json:"projects,omitempty"`
-			Days     []DayTotalDTO     `json:"days,omitempty"`
+			From     string `json:"from"`
+			To       string `json:"to"`
+			Timezone string `json:"timezone"`
+			// Pointers, so "this grouping was not requested" and "this grouping
+			// is empty" stop being the same thing on the wire. A plain slice with
+			// omitempty drops an empty result entirely, and every client then has
+			// to treat a missing key as an empty list — which the web client did
+			// not, and the analytics screen threw on the first quiet week.
+			Projects *[]ProjectTotalDTO `json:"projects,omitempty"`
+			Days     *[]DayTotalDTO     `json:"days,omitempty"`
 		}
 	}, error) {
 		p, err := requirePrincipal(ctx)
@@ -54,11 +59,16 @@ func (d Deps) registerReportRoutes(api huma.API) {
 
 		out := &struct {
 			Body struct {
-				From     string            `json:"from"`
-				To       string            `json:"to"`
-				Timezone string            `json:"timezone"`
-				Projects []ProjectTotalDTO `json:"projects,omitempty"`
-				Days     []DayTotalDTO     `json:"days,omitempty"`
+				From     string `json:"from"`
+				To       string `json:"to"`
+				Timezone string `json:"timezone"`
+				// Pointers, so "this grouping was not requested" and "this grouping
+				// is empty" stop being the same thing on the wire. A plain slice with
+				// omitempty drops an empty result entirely, and every client then has
+				// to treat a missing key as an empty list — which the web client did
+				// not, and the analytics screen threw on the first quiet week.
+				Projects *[]ProjectTotalDTO `json:"projects,omitempty"`
+				Days     *[]DayTotalDTO     `json:"days,omitempty"`
 			}
 		}{}
 		out.Body.From, out.Body.To = from.Format("2006-01-02T15:04:05Z07:00"), to.Format("2006-01-02T15:04:05Z07:00")
@@ -69,10 +79,11 @@ func (d Deps) registerReportRoutes(api huma.API) {
 			if derr != nil {
 				return nil, d.problem(ctx, derr)
 			}
-			out.Body.Days = make([]DayTotalDTO, 0, len(days))
+			rows := make([]DayTotalDTO, 0, len(days))
 			for _, row := range days {
-				out.Body.Days = append(out.Body.Days, DayTotalDTO{Date: row.Date, Seconds: row.Seconds})
+				rows = append(rows, DayTotalDTO{Date: row.Date, Seconds: row.Seconds})
 			}
+			out.Body.Days = &rows
 			return out, nil
 		}
 
@@ -80,14 +91,15 @@ func (d Deps) registerReportRoutes(api huma.API) {
 		if terr != nil {
 			return nil, d.problem(ctx, terr)
 		}
-		out.Body.Projects = make([]ProjectTotalDTO, 0, len(totals))
+		rows := make([]ProjectTotalDTO, 0, len(totals))
 		for _, row := range totals {
-			out.Body.Projects = append(out.Body.Projects, ProjectTotalDTO{
+			rows = append(rows, ProjectTotalDTO{
 				ProjectID: row.ProjectID.String(), Name: row.Name, Client: row.Client,
 				Seconds: row.Seconds, AmountCents: row.AmountCents,
 				Currency: row.Currency, Billable: row.Billable,
 			})
 		}
+		out.Body.Projects = &rows
 		return out, nil
 	})
 

@@ -171,7 +171,11 @@ export function App() {
             </button>
           ))}
         </nav>
-        <div className="ml-auto">
+        {/* The trigger's own padding is pulled outside the container, so the
+            account name ends on the same line as the cards below it rather
+            than six pixels short of it. The padding stays — it is the hover
+            target — it just stops pushing the text out of alignment. */}
+        <div className="-mr-1.5 ml-auto">
           <UserMenu
             account={account}
             onSettings={() => setView("settings")}
