@@ -340,3 +340,47 @@ func (d *Domain) RescanSession(ctx context.Context, p *auth.Principal, sessionID
 	}
 	return nil
 }
+
+// ConnectionScanWindow is how far back an account-level scan looks.
+//
+// Seven days, matching the window the janitor re-queues sessions over: a commit
+// pushed later than that has missed its session anyway, and asking GitHub for a
+// month of history on every account would spend the rate limit on work nobody
+// is waiting for.
+const ConnectionScanWindow = 7 * 24 * time.Hour
+
+// connectionScanEvery is how stale a connection has to be before it is scanned
+// again on its own account. Sessions still drive prompt scanning; this is the
+// floor under accounts that are not recording any.
+const connectionScanEvery = time.Hour
+
+// RunConnectionScans fetches commits for accounts, rather than for sessions.
+//
+// The session queue cannot help someone who has not recorded a session, and
+// that is precisely a new account: it connects GitHub, has nothing queued, and
+// so is never scanned. The result is an empty screen on the one day the
+// product most needs to show what it is for — the commits are all there on
+// GitHub, and punchcard simply never asked.
+//
+// So accounts get claimed too. Never-scanned ones come first, which makes this
+// the onboarding path as well as the maintenance one.
+func (d *Domain) RunConnectionScans(ctx context.Context, now time.Time, limit int32) error {
+	users, err := d.store.ClaimStaleGitHubConnections(ctx, db.ClaimStaleGitHubConnectionsParams{
+		Before: now.Add(-connectionScanEvery).UTC(), Lim: limit,
+	})
+	if err != nil {
+		return fmt.Errorf("claim stale github connections: %w", err)
+	}
+	for _, userID := range users {
+		if ctx.Err() != nil {
+			return nil
+		}
+		// ScanWindow records its own outcome on the connection, including the
+		// error, so a rate limit or a revoked token surfaces in the UI rather
+		// than only in the log.
+		if _, err := d.ScanWindow(ctx, userID, now.Add(-ConnectionScanWindow), now); err != nil {
+			d.log.WarnContext(ctx, "account commit scan failed", "user_id", userID, "error", err.Error())
+		}
+	}
+	return nil
+}

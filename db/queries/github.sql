@@ -85,3 +85,17 @@ ORDER BY committed_at ASC;
 
 -- name: DetachCommit :execrows
 DELETE FROM session_commits WHERE session_id = $1 AND commit_id = $2;
+
+-- Connections whose commits have not been fetched recently.
+--
+-- The session queue only ever holds sessions, so an account that has not
+-- recorded one is never scanned — which is exactly a new account, on the day
+-- it most needs to see something. This claims accounts instead: the ones that
+-- have never been scanned first, then the ones that have gone stale.
+-- name: ClaimStaleGitHubConnections :many
+SELECT user_id FROM github_connections
+WHERE revoked_at IS NULL
+  AND (last_scan_at IS NULL OR last_scan_at <= sqlc.arg(before)::timestamptz)
+ORDER BY last_scan_at ASC NULLS FIRST
+LIMIT sqlc.arg(lim)
+FOR UPDATE SKIP LOCKED;

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // hookMarker identifies punchcard's own entries in a settings file it does not
@@ -83,6 +84,17 @@ func (a *App) HookInstall() error {
 	}
 	if err := os.WriteFile(path, append(out, '\n'), 0o600); err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
+	}
+
+	// Stamp when live capture began. Backfill reads this and stops there, so
+	// the two mechanisms meet exactly instead of overlapping: everything before
+	// the stamp comes from transcripts, everything after from the hook, and no
+	// turn is counted twice.
+	if dir, derr := StateDir(); derr == nil {
+		if os.MkdirAll(dir, 0o700) == nil {
+			_ = os.WriteFile(filepath.Join(dir, "hooks-installed-at"),
+				[]byte(time.Now().UTC().Format(time.RFC3339Nano)), 0o600)
+		}
 	}
 
 	a.printf("hooks installed in %s\n", path)

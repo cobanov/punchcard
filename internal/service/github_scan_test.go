@@ -61,6 +61,14 @@ func (f *fakeGH) addStaleRepo(repo string) {
 	f.stale[repo] = true
 }
 
+// repoCalls is how many requests the scanner has made in total. Used to assert
+// that a freshly scanned account costs GitHub nothing on the next tick.
+func (f *fakeGH) repoCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls
+}
+
 // touched reports whether any request mentioned the repository.
 func (f *fakeGH) touched(repo string) bool {
 	f.mu.Lock()
@@ -677,5 +685,77 @@ func TestAQuietWindowStillRecordsTheScan(t *testing.T) {
 	}
 	if st.LastScanAt == nil {
 		t.Fatal("a scan that found nothing to look in is still a scan that ran")
+	}
+}
+
+// --- accounts, not just sessions ------------------------------------------
+
+// An account that has never recorded a session must still get its commits.
+//
+// This is the shape of a brand-new account, and it used to be the shape of an
+// empty screen: the scan queue only ever held sessions, so someone who had just
+// connected GitHub had nothing queued and was never scanned. Every commit was
+// sitting on GitHub and punchcard simply never asked for it — on the one day
+// the product most needs to show what it is for.
+func TestAnAccountWithNoSessionsStillGetsScanned(t *testing.T) {
+	e, gh := newGitHubEnv(t)
+	p, _ := e.connectedUser(t)
+	gh.addCommit("cobanov/x", "main", "beef123", at("11:15"))
+
+	if err := e.d.RunConnectionScans(e.ctx, at("12:00"), 10); err != nil {
+		t.Fatalf("connection scans: %v", err)
+	}
+
+	var n int
+	if err := e.pool.QueryRow(e.ctx,
+		`SELECT count(*) FROM commits WHERE user_id = $1`, p.UserID).Scan(&n); err != nil {
+		t.Fatalf("count commits: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("a connected account with no sessions fetched %d commits, want 1", n)
+	}
+}
+
+// Having been scanned recently is what stops it being scanned again. Without
+// this the loop would re-enumerate everyone's repositories every tick and spend
+// the rate limit on nothing.
+//
+// The staleness clock is real time on both sides — last_scan_at is written by
+// the database with now(), and the claim compares it against the caller's
+// clock — so this drives it with real timestamps rather than the synthetic
+// ones the attribution tests use, and backdates the column to simulate age.
+func TestARecentlyScannedAccountIsLeftAlone(t *testing.T) {
+	e, gh := newGitHubEnv(t)
+	p, _ := e.connectedUser(t)
+	gh.addCommit("cobanov/x", "main", "cafe456", at("11:15"))
+
+	now := time.Now()
+	if err := e.d.RunConnectionScans(e.ctx, now, 10); err != nil {
+		t.Fatalf("first pass: %v", err)
+	}
+	before := gh.repoCalls()
+	if before == 0 {
+		t.Fatal("the first pass asked GitHub for nothing")
+	}
+
+	// A minute later it is still fresh, so GitHub should hear nothing.
+	if err := e.d.RunConnectionScans(e.ctx, now.Add(time.Minute), 10); err != nil {
+		t.Fatalf("second pass: %v", err)
+	}
+	if after := gh.repoCalls(); after != before {
+		t.Fatalf("a freshly scanned account was scanned again (%d then %d calls)", before, after)
+	}
+
+	// Age the connection past the threshold and it is picked up again.
+	if _, err := e.pool.Exec(e.ctx,
+		`UPDATE github_connections SET last_scan_at = now() - interval '2 hours' WHERE user_id = $1`,
+		p.UserID); err != nil {
+		t.Fatalf("backdate scan: %v", err)
+	}
+	if err := e.d.RunConnectionScans(e.ctx, time.Now(), 10); err != nil {
+		t.Fatalf("third pass: %v", err)
+	}
+	if after := gh.repoCalls(); after <= before {
+		t.Fatalf("a stale account was never re-scanned (%d calls, was %d)", after, before)
 	}
 }

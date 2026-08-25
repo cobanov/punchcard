@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/cobanov/punchcard/internal/cli"
@@ -35,6 +36,11 @@ func run() int {
 	// Code because that is what `hook install` wires up; anything else is
 	// integrating through the queue file and can say so.
 	hookTool := "claude-code"
+	// How far back `backfill` reads. Ninety days is a quarter of history, which
+	// is enough to make a new account's first screen worth looking at without
+	// reading years of transcripts to get there.
+	backfillDays := 90
+	dryRun := false
 	var rest []string
 	for _, a := range args {
 		switch {
@@ -42,6 +48,12 @@ func run() int {
 			app.JSON = true
 		case strings.HasPrefix(a, "--tool="):
 			hookTool = strings.TrimPrefix(a, "--tool=")
+		case a == "--dry-run":
+			dryRun = true
+		case strings.HasPrefix(a, "--days="):
+			if n, err := strconv.Atoi(strings.TrimPrefix(a, "--days=")); err == nil && n > 0 {
+				backfillDays = n
+			}
 		case strings.HasPrefix(a, "--url="):
 			app.BaseURL = strings.TrimPrefix(a, "--url=")
 		default:
@@ -116,6 +128,8 @@ func run() int {
 		}
 	case "sync":
 		cmdErr = app.Sync()
+	case "backfill":
+		cmdErr = app.Backfill(cli.BackfillOptions{Days: backfillDays, DryRun: dryRun})
 	case "version", "--version", "-v":
 		fmt.Println("punchcard", version)
 		return 0
@@ -163,6 +177,7 @@ Commands:
   today                      Today's records with their commits
   week                       The last seven days
   sync                       Send recorded agent turns to the server
+  backfill [--days=N]        Reconstruct past turns from local transcripts
   hook install               Record Claude Code turns as evidence
   projects                   List projects
   new <name> [client] [rate] [currency]

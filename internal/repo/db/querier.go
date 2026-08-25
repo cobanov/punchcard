@@ -38,6 +38,13 @@ type Querier interface {
 	// A real timestamp now means only one thing: a backoff deadline, written by the
 	// same code that reads it.
 	ClaimPendingSyncSessions(ctx context.Context, arg ClaimPendingSyncSessionsParams) ([]WorkSession, error)
+	// Connections whose commits have not been fetched recently.
+	//
+	// The session queue only ever holds sessions, so an account that has not
+	// recorded one is never scanned — which is exactly a new account, on the day
+	// it most needs to see something. This claims accounts instead: the ones that
+	// have never been scanned first, then the ones that have gone stale.
+	ClaimStaleGitHubConnections(ctx context.Context, arg ClaimStaleGitHubConnectionsParams) ([]uuid.UUID, error)
 	ClaimUnprocessedEvents(ctx context.Context, limit int32) ([]Event, error)
 	ClearTOTP(ctx context.Context, id uuid.UUID) error
 	CountActiveTokens(ctx context.Context, userID uuid.UUID) (int64, error)

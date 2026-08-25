@@ -46,6 +46,46 @@ func (q *Queries) AttachCommitToSession(ctx context.Context, arg AttachCommitToS
 	return result.RowsAffected(), nil
 }
 
+const claimStaleGitHubConnections = `-- name: ClaimStaleGitHubConnections :many
+SELECT user_id FROM github_connections
+WHERE revoked_at IS NULL
+  AND (last_scan_at IS NULL OR last_scan_at <= $1::timestamptz)
+ORDER BY last_scan_at ASC NULLS FIRST
+LIMIT $2
+FOR UPDATE SKIP LOCKED
+`
+
+type ClaimStaleGitHubConnectionsParams struct {
+	Before time.Time `json:"before"`
+	Lim    int32     `json:"lim"`
+}
+
+// Connections whose commits have not been fetched recently.
+//
+// The session queue only ever holds sessions, so an account that has not
+// recorded one is never scanned — which is exactly a new account, on the day
+// it most needs to see something. This claims accounts instead: the ones that
+// have never been scanned first, then the ones that have gone stale.
+func (q *Queries) ClaimStaleGitHubConnections(ctx context.Context, arg ClaimStaleGitHubConnectionsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, claimStaleGitHubConnections, arg.Before, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var user_id uuid.UUID
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countCommitsForSessions = `-- name: CountCommitsForSessions :many
 SELECT sc.session_id, count(*)::bigint AS n
 FROM session_commits sc

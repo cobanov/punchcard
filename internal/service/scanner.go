@@ -11,6 +11,10 @@ import (
 // day's work drains in a single tick.
 const scanBatch = 50
 
+// connectionBatch is how many accounts one pass scans. Smaller than the session
+// batch because each one is a full enumeration of somebody's repositories.
+const connectionBatch = 10
+
 // Scanner is the background loop behind the commit matching: it drains the scan
 // queue, and periodically puts the last week back on it.
 //
@@ -71,5 +75,11 @@ func (s *Scanner) Run(ctx context.Context) {
 func (s *Scanner) drainOnce(ctx context.Context) {
 	if err := s.domain.RunPendingScans(ctx, time.Now(), scanBatch); err != nil && ctx.Err() == nil {
 		s.log.Error("commit scan pass failed", "error", err.Error())
+	}
+	// Accounts, not just sessions. A connection that has never been scanned is
+	// claimed first, so a new account sees its own week of work within a tick
+	// of connecting rather than never.
+	if err := s.domain.RunConnectionScans(ctx, time.Now(), connectionBatch); err != nil && ctx.Err() == nil {
+		s.log.Error("account commit scan pass failed", "error", err.Error())
 	}
 }
