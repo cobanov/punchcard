@@ -316,8 +316,15 @@ func (d Deps) connectGitHubIfGranted(ctx context.Context, userID uuid.UUID, id o
 	if !slices.Contains(strings.Split(id.GrantedScopes, ","), service.GitHubScope) {
 		return
 	}
+	// id.Username, NOT id.ProviderUserID. The scanner asks GitHub for
+	// `author=<login>`; the numeric id matches no commits and reports it as
+	// "no work happened".
+	if id.Username == "" {
+		d.Logger.WarnContext(ctx, "github identity carried no login; commit matching would find nothing")
+		return
+	}
 	p := &auth.Principal{UserID: userID, ViaSession: true, Scope: auth.ScopeReadWrite}
-	if err := d.Domain.ConnectGitHub(ctx, p, id.ProviderUserID, id.AccessToken, id.GrantedScopes); err != nil {
+	if err := d.Domain.ConnectGitHub(ctx, p, id.Username, id.AccessToken, id.GrantedScopes); err != nil {
 		d.Logger.WarnContext(ctx, "could not store github connection", "error", err)
 	}
 }

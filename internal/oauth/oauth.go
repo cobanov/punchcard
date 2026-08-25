@@ -37,6 +37,14 @@ type Identity struct {
 	Name           string
 	EmailVerified  bool
 
+	// Username is the provider's human-facing handle, when it has one. GitHub
+	// is the only provider that does, and punchcard needs it for a reason
+	// nothing else does: the commit scanner filters by `author=<login>`, and a
+	// numeric id matches nothing — silently, which is the failure mode this
+	// whole feature is built to avoid. It is NOT an identity: GitHub logins can
+	// be renamed, so account linking still keys on ProviderUserID.
+	Username string
+
 	// AccessToken and GrantedScopes are what the provider actually handed over.
 	// Only the GitHub connection uses them, and only to store an encrypted
 	// token for the commit scanner. Never log either field.
@@ -217,7 +225,12 @@ func fetchGoogle(ctx context.Context, conf *oauth2.Config, tok *oauth2.Token) (I
 // email can be unverified/public, so the address is taken only from the
 // primary+verified entry of /user/emails.
 func fetchGitHub(ctx context.Context, conf *oauth2.Config, tok *oauth2.Token) (Identity, error) {
-	client := conf.Client(ctx, tok)
+	return fetchGitHubFrom(ctx, conf.Client(ctx, tok), "https://api.github.com")
+}
+
+// fetchGitHubFrom is fetchGitHub with the API's address as a parameter, so the
+// identity mapping can be tested against a fake rather than against GitHub.
+func fetchGitHubFrom(ctx context.Context, client *http.Client, baseURL string) (Identity, error) {
 	ghHeaders := map[string]string{"Accept": "application/vnd.github+json"}
 
 	var prof struct {
@@ -225,7 +238,7 @@ func fetchGitHub(ctx context.Context, conf *oauth2.Config, tok *oauth2.Token) (I
 		Name  string `json:"name"`
 		Login string `json:"login"`
 	}
-	if err := getJSON(ctx, client, "https://api.github.com/user", ghHeaders, &prof); err != nil {
+	if err := getJSON(ctx, client, baseURL+"/user", ghHeaders, &prof); err != nil {
 		return Identity{}, fmt.Errorf("github user: %w", err)
 	}
 
@@ -234,7 +247,7 @@ func fetchGitHub(ctx context.Context, conf *oauth2.Config, tok *oauth2.Token) (I
 		Primary  bool   `json:"primary"`
 		Verified bool   `json:"verified"`
 	}
-	if err := getJSON(ctx, client, "https://api.github.com/user/emails", ghHeaders, &emails); err != nil {
+	if err := getJSON(ctx, client, baseURL+"/user/emails", ghHeaders, &emails); err != nil {
 		return Identity{}, fmt.Errorf("github emails: %w", err)
 	}
 
@@ -260,6 +273,7 @@ func fetchGitHub(ctx context.Context, conf *oauth2.Config, tok *oauth2.Token) (I
 	}
 	return Identity{
 		ProviderUserID: strconv.FormatInt(prof.ID, 10),
+		Username:       prof.Login,
 		Email:          email,
 		Name:           name,
 		EmailVerified:  email != "", // only verified addresses reach here
