@@ -97,12 +97,25 @@ mid-stream.
 
 A 403 confirms the row exists. Every ownership check returns `ErrNotFound`.
 
+### The bare hostname needs an answer
+
+v1 dropped the SPA, and for one afternoon nothing replaced it: chi's default
+handler answered `/` with the words "404 page not found". The service was
+healthy and every endpoint worked, but anyone who opened the URL — including its
+author — saw a broken site.
+
+`internal/http/landing` is the fix, and `r.NotFound` now answers in the same
+problem+json shape as every other error rather than text/plain. If the SPA ever
+lands, it replaces the landing page; it does not replace the NotFound handler,
+because an unmatched `/v1/...` path is still an API error.
+
 ## What was deliberately left behind
 
 Ported from helva and then removed, so you do not go looking for them: lists,
 tasks, memberships, invites, the ordering (`position`) machinery, the activity
 log, the Gemini chat, the MCP surface, offline sync, and the entire `web/` tree
-with its embedded-dist deploy traps. v1 serves no HTML but the OpenAPI explorer.
+with its embedded-dist deploy traps. The only HTML v1 serves is the landing
+page, the legal documents and the OpenAPI explorer — all static, no build step.
 
 Kept because they cost nothing and the CLI will want them: `internal/service/native_code.go`
 (the browser-to-client code exchange a `punchcard login` command would use) and

@@ -16,8 +16,9 @@ Free to use — run the hosted instance or self-host the identical single binary
 ## Status
 
 **v1 is the backend.** A working, documented API: accounts, projects, timers,
-reports and GitHub commit matching, with an OpenAPI document at `/docs`. There is
-no web interface yet; it gets its own design and its own release.
+reports and GitHub commit matching, with interactive documentation at `/docs`
+and a one-page explanation at `/`. There is no web interface yet; it gets its
+own design and its own release.
 
 ## Quick start (self-host)
 

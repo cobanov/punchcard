@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>punchcard</title>
+<meta name="description" content="Time tracking for developers, with the commits attached.">
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --fg: #1b1a17;
+    --muted: #6b675f;
+    --rule: #e4e0d8;
+    --accent: #b4471f;
+    --code-bg: #f2efe9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14130f;
+      --fg: #eceae4;
+      --muted: #9b968c;
+      --rule: #2c2a24;
+      --accent: #e2825a;
+      --code-bg: #1e1c17;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 4rem 1.5rem 6rem;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.65 ui-serif, Georgia, "Times New Roman", serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 34rem; margin: 0 auto; }
+  h1 {
+    font-size: 1.5rem;
+    letter-spacing: -0.01em;
+    margin: 0 0 .35rem;
+    font-weight: 600;
+  }
+  .tag { color: var(--muted); margin: 0 0 2.5rem; }
+  h2 {
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 2.5rem 0 .75rem;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  p { margin: 0 0 1rem; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  ul { margin: 0; padding: 0; list-style: none; }
+  li { padding: .55rem 0; border-bottom: 1px solid var(--rule); display: flex; gap: 1rem; }
+  li:last-child { border-bottom: 0; }
+  li code { flex: 0 0 auto; }
+  li span { color: var(--muted); font-size: .9rem; }
+  code {
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--code-bg);
+    padding: .12rem .35rem;
+    border-radius: 3px;
+  }
+  .note {
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: .9rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>punchcard</h1>
+  <p class="tag">Time tracking for developers, with the commits attached.</p>
+
+  <p>
+    Start a timer against a project, say what you are doing, stop it. When you
+    stop, punchcard fetches the commits you pushed during that stretch and
+    attaches them to the record — so a day's log is not <em>“3 hours,
+    refactor”</em> but <em>“3 hours, refactor, 7 commits, these files”</em>.
+  </p>
+  <p>
+    It works in reverse too: commits made while no timer was running come back
+    as a suggested record. That is how a forgotten timer gets recovered — the
+    evidence was on GitHub all along.
+  </p>
+
+  <h2>This release is the API</h2>
+  <p>
+    There is no web interface yet; it gets its own design and its own release.
+    Everything the product does is available over HTTP today:
+  </p>
+
+  <ul>
+    <li><code><a href="/docs">/docs</a></code> <span>Interactive API documentation</span></li>
+    <li><code><a href="/openapi.json">/openapi.json</a></code> <span>OpenAPI document</span></li>
+    <li><code><a href="/healthz">/healthz</a></code> <span>Liveness</span></li>
+    <li><code>/v1/sessions</code> <span>Start, stop and correct work sessions</span></li>
+    <li><code>/v1/reports/summary</code> <span>Totals by project or by day</span></li>
+  </ul>
+
+  <p class="note">
+    Open source, MIT licensed. Run the hosted instance or self-host the
+    identical single binary.
+  </p>
+</main>
+</body>
+</html>

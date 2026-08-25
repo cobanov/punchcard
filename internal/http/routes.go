@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net"
+	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
@@ -12,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/cobanov/punchcard/internal/config"
+	"github.com/cobanov/punchcard/internal/http/landing"
 	"github.com/cobanov/punchcard/internal/http/legal"
 	"github.com/cobanov/punchcard/internal/oauth"
 	"github.com/cobanov/punchcard/internal/observability"
@@ -120,6 +122,11 @@ func BuildRouter(d Deps) (*chi.Mux, huma.API) {
 	d.registerAccountRoutes(api)
 	d.registerWebhookRoutes(api)
 
+	// The one page this release has. v1 serves no SPA, and before this existed
+	// the bare hostname answered chi's default "404 page not found" — a healthy
+	// service that read as broken to whoever opened it.
+	r.Get("/", landing.Handler())
+
 	// Legal documents. Public, unauthenticated, and served as their own HTML
 	// rather than as SPA routes: App Store Connect requires a reachable privacy
 	// policy URL and App Review opens it directly, as do link previews and
@@ -129,6 +136,18 @@ func BuildRouter(d Deps) (*chi.Mux, huma.API) {
 	// The Support URL App Store Connect asks for has to lead to a working
 	// support page — a mailto: link there is a routine rejection.
 	r.Get("/support", legal.Handler("support.html"))
+
+	// Everything unmatched answers in the same shape as every other error this
+	// API produces. chi's default is text/plain, which would break a client's
+	// error handling on exactly the case it is most likely to hit: a typo'd or
+	// outdated URL.
+	r.NotFound(func(w http.ResponseWriter, req *http.Request) {
+		writeProblem(w, http.StatusNotFound, "not_found", "no route matches "+req.URL.Path)
+	})
+	r.MethodNotAllowed(func(w http.ResponseWriter, req *http.Request) {
+		writeProblem(w, http.StatusMethodNotAllowed, "method_not_allowed",
+			req.Method+" is not allowed on "+req.URL.Path)
+	})
 
 	return r, api
 }
