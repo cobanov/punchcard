@@ -86,13 +86,14 @@ type Span = { from: number; end: number };
 /**
  * How close two turns have to be before they are drawn as one stretch.
  *
- * A hundred turns a day, most of them a minute or two, drawn individually come
- * out as a dotted rash rather than as an answer to "when was an agent working".
- * Five minutes is the gap at which the pause stops being you reading what came
- * back and starts being you gone; at this strip's width it is also about three
- * pixels, below which a gap is not legible anyway.
+ * The same fifteen minutes the reconstruction uses to decide a turn stopped
+ * being one turn, and for the same reason: below it the pause is you reading
+ * what came back or typing the next thing, above it you were gone. Using two
+ * different numbers for one idea was what left a two-hour session sitting above
+ * nine fragments of its own project — the gaps between them were eight and
+ * twelve minutes, which is not a break.
  */
-const MERGE_GAP = 5;
+const MERGE_GAP = 15;
 
 /** One stretch of agent work: turns that ran back to back in the same place. */
 type RunStretch = {
@@ -116,6 +117,19 @@ type RunStretch = {
  * timeline, and the streams are packed into lanes afterwards.
  */
 function mergeRuns(runs: AgentRun[]): RunStretch[] {
+  // Directories that merely contain other work are not places work happened.
+  //
+  // A third of runs have no git remote, and naming their stream after the
+  // directory turned ~/ and ~/Developer into projects called "cobanov" and
+  // "developer" — sitting in the band next to real ones, with their own colours
+  // and lanes. The test is in the data rather than in a list of names to
+  // maintain: a directory that is an ancestor of another directory work
+  // happened in is a parent, not a project.
+  const dirs = runs.map((r) => r.cwd ?? "").filter(Boolean);
+  const generic = new Set(
+    dirs.filter((d) => dirs.some((other) => other !== d && other.startsWith(`${d}/`))),
+  );
+
   const streams = new Map<string, RunStretch[]>();
   for (const r of runs) {
     const from = minuteOfDay(r.started_at);
@@ -126,8 +140,12 @@ function mergeRuns(runs: AgentRun[]): RunStretch[] {
     // The same project arrives spelled two ways — "cobanov/herdrchat" from a
     // directory with a git remote, "herdrchat" from one without — and giving
     // them separate lanes and colours would invent a distinction nobody has.
-    const key = workKey(r.repo, r.cwd) || r.tool;
-    const label = workLabel(r.repo, r.cwd, r.tool);
+    //
+    // Work in a parent directory keeps its time but loses its name: it is
+    // collected into one honest stream rather than a fictional project.
+    const anonymous = !r.repo && generic.has(r.cwd ?? "");
+    const key = anonymous ? "" : workKey(r.repo, r.cwd) || r.tool;
+    const label = anonymous ? "elsewhere" : workLabel(r.repo, r.cwd, r.tool);
 
     const stream = streams.get(key) ?? [];
     const last = stream[stream.length - 1];
