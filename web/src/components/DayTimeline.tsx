@@ -36,6 +36,10 @@ function minuteOfDay(iso: string): number {
 
 const pct = (minutes: number) => (minutes / MINUTES) * 100;
 
+/** Minutes past midnight as a clock face. */
+const clock = (minutes: number) =>
+  `${String(Math.floor(minutes / 60) % 24).padStart(2, "0")}:${String(Math.round(minutes) % 60).padStart(2, "0")}`;
+
 /**
  * The hours are marked at three densities, because one density can only answer
  * one question. Every hour, barely visible, gives the eye something to measure
@@ -56,6 +60,69 @@ const LANDMARKS = [0, 6, 12, 18, 24];
 const MAX_LANES = 3;
 
 type Span = { from: number; end: number };
+
+/**
+ * How close two turns have to be before they are drawn as one stretch.
+ *
+ * A hundred turns a day, most of them a minute or two, drawn individually come
+ * out as a dotted rash rather than as an answer to "when was an agent working".
+ * Five minutes is the gap at which the pause stops being you reading what came
+ * back and starts being you gone; at this strip's width it is also about three
+ * pixels, below which a gap is not legible anyway.
+ */
+const MERGE_GAP = 5;
+
+/** One stretch of agent work: turns that ran back to back in the same place. */
+type RunStretch = {
+  from: number;
+  end: number;
+  key: string;
+  label: string;
+  seconds: number;
+  turns: number;
+  tool: string;
+  model: string;
+};
+
+/**
+ * Merge adjacent turns into stretches — but only within the same repository.
+ *
+ * Merging everything by time alone would erase the thing the lanes exist to
+ * show. Two agents in two repositories at once is the ordinary case here, and
+ * collapsing them into one bar would report the day as sequential when it was
+ * parallel. So each repository is its own stream, merged along its own
+ * timeline, and the streams are packed into lanes afterwards.
+ */
+function mergeRuns(runs: AgentRun[]): RunStretch[] {
+  const streams = new Map<string, RunStretch[]>();
+  for (const r of runs) {
+    const from = minuteOfDay(r.started_at);
+    const to = minuteOfDay(r.ended_at);
+    const end = to < from ? MINUTES : to;
+    if (end < from) continue;
+
+    // A run with no remote is still somewhere: the directory is the weaker
+    // answer but it still separates one piece of work from another.
+    const key = r.repo || r.cwd || r.tool;
+    const label = r.repo || (r.cwd ? r.cwd.split("/").filter(Boolean).pop() ?? r.tool : r.tool);
+
+    const stream = streams.get(key) ?? [];
+    const last = stream[stream.length - 1];
+    if (last && from - last.end <= MERGE_GAP) {
+      last.end = Math.max(last.end, end);
+      last.seconds += r.seconds;
+      last.turns += 1;
+      if (r.model) last.model = r.model;
+    } else {
+      stream.push({
+        from, end, key, label, seconds: r.seconds, turns: 1,
+        tool: r.tool, model: r.model ?? "",
+      });
+    }
+    streams.set(key, stream);
+  }
+  return [...streams.values()].flat().sort((a, b) => a.from - b.from);
+}
 
 /**
  * Greedy interval packing: each span goes in the first lane whose previous span
@@ -128,16 +195,7 @@ export function DayTimeline({
     })
     .filter((b) => b.end >= b.from);
 
-  const runSpans = packLanes(
-    runs
-      .map((r) => {
-        const from = minuteOfDay(r.started_at);
-        const to = minuteOfDay(r.ended_at);
-        return { r, from, end: to < from ? MINUTES : to };
-      })
-      .filter((b) => b.end >= b.from)
-      .sort((a, b) => a.from - b.from),
-  );
+  const runSpans = packLanes(mergeRuns(runs));
   const laneCount = Math.min(Math.max(...runSpans.map((s) => s.lane + 1), 1), MAX_LANES);
 
   if (!blocks.length && !runSpans.length) return null;
@@ -201,7 +259,7 @@ export function DayTimeline({
             same kind of fact. */}
         {runSpans.map((b, i) => (
           <span
-            key={`${b.r.started_at}-${i}`}
+            key={`${b.key}-${b.from}-${i}`}
             className="bar-rise absolute rounded-[2px] bg-dim/45"
             style={{
               left: `${pct(b.from)}%`,
@@ -215,8 +273,12 @@ export function DayTimeline({
                 at: (b.from + b.end) / 2,
                 info: {
                   kind: "run",
-                  label: b.r.repo || b.r.tool,
-                  sub: `${hhmm(b.r.started_at)}–${hhmm(b.r.ended_at)} · ${total(b.r.seconds)}${b.r.model ? ` · ${b.r.model}` : ""}`,
+                  label: b.label,
+                  // Both numbers, because they answer different questions: how
+                  // long the stretch lasted, and how much agent time went into
+                  // it. Parallel turns make the second larger than the first,
+                  // and hiding that would be the misleading choice.
+                  sub: `${clock(b.from)}–${clock(b.end)} · ${total(b.seconds)} over ${b.turns} turn${b.turns === 1 ? "" : "s"}`,
                   colour: "var(--color-dim)",
                 },
               })

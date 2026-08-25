@@ -327,6 +327,14 @@ function UnmatchedRow({
   const suggestedName = repo ? repoBase(repo) : (cluster.dirs?.[0] ?? "");
   const runs = cluster.agent_runs ?? [];
   const agentSeconds = runs.reduce((sum, r) => sum + r.seconds, 0);
+  // Wall time, which is what recording this actually produces. Agents run in
+  // parallel, so their hours add up to more than the stretch they ran in — the
+  // first real cluster on screen said "2h 34m" above a window of 74 minutes,
+  // which is two true numbers arranged into a false impression.
+  const spanSeconds = Math.max(
+    0,
+    Math.round((new Date(cluster.to).getTime() - new Date(cluster.from).getTime()) / 1000),
+  );
   // A project already named after the repository is almost certainly the one
   // meant, even when nothing was ever linked.
   const byName = projects.find(
@@ -364,12 +372,18 @@ function UnmatchedRow({
               reads as a bug rather than as a very short turn. */}
           {runs.length > 0 &&
             (agentSeconds >= 60
-              ? `${total(agentSeconds)} of agent work`
+              ? `${total(spanSeconds)} with agents`
               : `${runs.length} agent run${runs.length === 1 ? "" : "s"}`)}
         </span>
         {" · "}
         {clusterDayLabel(cluster.from)}
-        {hhmm(cluster.from)}–{hhmm(cluster.to)} · no timer was running ·{" "}
+        {hhmm(cluster.from)}–{hhmm(cluster.to)}
+        {runs.length > 0 && agentSeconds > spanSeconds + 60 && (
+          <span title="Agents ran in parallel, so their time adds up to more than the stretch">
+            {" "}· {total(agentSeconds)} across {runs.length} runs
+          </span>
+        )}{" "}
+        · no timer was running ·{" "}
         <span className="font-mono t-caption">{repos || cluster.dirs?.join(", ") || "—"}</span>
       </span>
       <select
