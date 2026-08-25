@@ -116,7 +116,6 @@ func BuildRouter(d Deps) (*chi.Mux, huma.API) {
 	d.registerAccountRoutes(api)
 	d.registerWebhookRoutes(api)
 
-
 	// Legal documents. Public, unauthenticated, and served as their own HTML
 	// rather than as SPA routes: App Store Connect requires a reachable privacy
 	// policy URL and App Review opens it directly, as do link previews and
@@ -126,7 +125,6 @@ func BuildRouter(d Deps) (*chi.Mux, huma.API) {
 	// The Support URL App Store Connect asks for has to lead to a working
 	// support page — a mailto: link there is a routine rejection.
 	r.Get("/support", legal.Handler("support.html"))
-
 
 	return r, api
 }

@@ -89,7 +89,7 @@ func (a *Auth) Register(ctx context.Context, emailAddr, password, ip, userAgent 
 	if err != nil {
 		return db.User{}, SessionIssue{}, fmt.Errorf("new uuid: %w", err)
 	}
-	// Create the account and its default personal "Inbox" list atomically.
+	// Create the account and its default project atomically.
 	var user db.User
 	err = a.store.WithTx(ctx, func(q *db.Queries) error {
 		u, e := q.CreateUser(ctx, db.CreateUserParams{ID: id, Email: addr, PasswordHash: hash})
@@ -97,7 +97,7 @@ func (a *Auth) Register(ctx context.Context, emailAddr, password, ip, userAgent 
 			return e
 		}
 		user = u
-		_, e = createListTx(ctx, q, "Inbox", u.ID, true, nil)
+		_, e = createDefaultProjectTx(ctx, q, u.ID)
 		return e
 	})
 	if err != nil {
@@ -235,7 +235,7 @@ func (a *Auth) MintDeviceToken(ctx context.Context, userID uuid.UUID, clientName
 	if _, err := a.store.CreateAPIToken(ctx, db.CreateAPITokenParams{
 		ID: id, UserID: userID, Name: name,
 		TokenHash: auth.HashToken(full), TokenPrefix: prefix,
-		Scope: auth.ScopeReadWrite, ScopedListIds: nil, ExpiresAt: nil,
+		Scope: auth.ScopeReadWrite, ScopedProjectIds: nil, ExpiresAt: nil,
 		Kind: auth.TokenKindDevice,
 	}); err != nil {
 		return "", fmt.Errorf("create device token: %w", err)
@@ -251,7 +251,7 @@ func (a *Auth) Logout(ctx context.Context, p *auth.Principal, ip string) error {
 	}
 	switch {
 	case p.SessionID != nil:
-		if _, err := a.store.RevokeSession(ctx, db.RevokeSessionParams{ID: *p.SessionID, UserID: p.UserID}); err != nil {
+		if _, err := a.store.RevokeAuthSession(ctx, db.RevokeAuthSessionParams{ID: *p.SessionID, UserID: p.UserID}); err != nil {
 			return fmt.Errorf("revoke session: %w", err)
 		}
 	case p.TokenID != nil:
@@ -348,7 +348,7 @@ func (a *Auth) ConfirmPasswordReset(ctx context.Context, token, newPassword, ip 
 		if err := q.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{ID: et.UserID, PasswordHash: hash}); err != nil {
 			return err
 		}
-		return q.RevokeAllUserSessions(ctx, et.UserID)
+		return q.RevokeAllUserAuthSessions(ctx, et.UserID)
 	})
 	if err != nil {
 		return err
@@ -363,7 +363,7 @@ func (a *Auth) ConfirmPasswordReset(ctx context.Context, token, newPassword, ip 
 type CreateTokenInput struct {
 	Name          string
 	Scope         string
-	ScopedListIDs []uuid.UUID
+	ScopedProjectIDs []uuid.UUID
 	ExpiresAt     *time.Time
 }
 
@@ -398,7 +398,7 @@ func (a *Auth) CreateToken(ctx context.Context, p *auth.Principal, in CreateToke
 	tok, err := a.store.CreateAPIToken(ctx, db.CreateAPITokenParams{
 		ID: id, UserID: p.UserID, Name: strings.TrimSpace(in.Name),
 		TokenHash: auth.HashToken(full), TokenPrefix: prefix,
-		Scope: in.Scope, ScopedListIds: in.ScopedListIDs, ExpiresAt: in.ExpiresAt,
+		Scope: in.Scope, ScopedProjectIds: in.ScopedProjectIDs, ExpiresAt: in.ExpiresAt,
 		// A token the user issued for a program. It never reaches the account
 		// plane, however wide its scope — see Principal.FirstParty.
 		Kind: auth.TokenKindPAT,
@@ -441,11 +441,11 @@ func (a *Auth) RevokeToken(ctx context.Context, p *auth.Principal, id uuid.UUID,
 // --- Sessions (session-only management) ---
 
 // ListSessions lists the user's active sessions.
-func (a *Auth) ListSessions(ctx context.Context, p *auth.Principal) ([]db.Session, error) {
+func (a *Auth) ListSessions(ctx context.Context, p *auth.Principal) ([]db.AuthSession, error) {
 	if !p.FirstParty() {
 		return nil, ErrSessionOnly
 	}
-	sessions, err := a.store.ListSessionsByUser(ctx, p.UserID)
+	sessions, err := a.store.ListAuthSessionsByUser(ctx, p.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("list sessions: %w", err)
 	}
@@ -457,7 +457,7 @@ func (a *Auth) RevokeSession(ctx context.Context, p *auth.Principal, id uuid.UUI
 	if !p.FirstParty() {
 		return ErrSessionOnly
 	}
-	n, err := a.store.RevokeSession(ctx, db.RevokeSessionParams{ID: id, UserID: p.UserID})
+	n, err := a.store.RevokeAuthSession(ctx, db.RevokeAuthSessionParams{ID: id, UserID: p.UserID})
 	if err != nil {
 		return fmt.Errorf("revoke session: %w", err)
 	}
@@ -510,7 +510,7 @@ func (a *Auth) ChangePassword(ctx context.Context, p *auth.Principal, current, n
 			return err
 		}
 		// Revoke every other session; the current one stays valid.
-		return q.RevokeOtherUserSessions(ctx, db.RevokeOtherUserSessionsParams{UserID: p.UserID, ID: keep})
+		return q.RevokeOtherUserAuthSessions(ctx, db.RevokeOtherUserAuthSessionsParams{UserID: p.UserID, ID: keep})
 	})
 	if err != nil {
 		return fmt.Errorf("change password: %w", err)
@@ -598,7 +598,7 @@ func (a *Auth) UpdateEmail(ctx context.Context, p *auth.Principal, newEmail, ip 
 // AuthenticateSession resolves a session cookie token into a Principal and
 // renews the sliding expiry (capped at the absolute expiry).
 func (a *Auth) AuthenticateSession(ctx context.Context, token string) (*auth.Principal, error) {
-	row, err := a.store.GetSessionByHash(ctx, auth.HashToken(token))
+	row, err := a.store.GetAuthSessionByHash(ctx, auth.HashToken(token))
 	if err != nil {
 		if repo.IsNotFound(err) {
 			return nil, ErrUnauthenticated
@@ -606,12 +606,12 @@ func (a *Auth) AuthenticateSession(ctx context.Context, token string) (*auth.Pri
 		return nil, fmt.Errorf("get session: %w", err)
 	}
 	newExp := time.Now().UTC().Add(sessionSliding)
-	if newExp.After(row.Session.AbsoluteExpiresAt) {
-		newExp = row.Session.AbsoluteExpiresAt
+	if newExp.After(row.AuthSession.AbsoluteExpiresAt) {
+		newExp = row.AuthSession.AbsoluteExpiresAt
 	}
-	_ = a.store.TouchSession(ctx, db.TouchSessionParams{ID: row.Session.ID, ExpiresAt: newExp})
+	_ = a.store.TouchAuthSession(ctx, db.TouchAuthSessionParams{ID: row.AuthSession.ID, ExpiresAt: newExp})
 
-	sid := row.Session.ID
+	sid := row.AuthSession.ID
 	return &auth.Principal{
 		UserID:        row.User.ID,
 		Email:         row.User.Email,
@@ -643,7 +643,7 @@ func (a *Auth) AuthenticatePAT(ctx context.Context, token string) (*auth.Princip
 		ViaDevice:     row.ApiToken.Kind == auth.TokenKindDevice,
 		TokenID:       &tid,
 		Scope:         row.ApiToken.Scope,
-		ScopedListIDs: row.ApiToken.ScopedListIds,
+		ScopedProjectIDs: row.ApiToken.ScopedProjectIds,
 	}, nil
 }
 
@@ -666,7 +666,7 @@ func (a *Auth) issueSession(ctx context.Context, userID uuid.UUID, ip, userAgent
 	if userAgent != "" {
 		uap = &userAgent
 	}
-	if _, err := a.store.CreateSession(ctx, db.CreateSessionParams{
+	if _, err := a.store.CreateAuthSession(ctx, db.CreateAuthSessionParams{
 		ID: id, UserID: userID, TokenHash: auth.HashToken(token),
 		ExpiresAt: now.Add(sessionSliding), AbsoluteExpiresAt: now.Add(sessionAbsolute),
 		Ip: ipp, UserAgent: uap,

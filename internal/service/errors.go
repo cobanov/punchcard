@@ -25,11 +25,12 @@ var (
 	ErrTokenInvalid       = &Error{http.StatusBadRequest, "token_invalid", "the token is invalid or has expired"}
 	ErrTwoFactorRequired  = &Error{http.StatusUnauthorized, "two_factor_required", "a two-factor code is required"}
 	ErrTwoFactorChallenge = &Error{http.StatusUnauthorized, "two_factor_challenge_invalid", "the two-factor challenge is invalid or expired"}
+	ErrInvalid            = &Error{http.StatusUnprocessableEntity, "validation_failed", "the request is not valid"}
+	ErrConflict           = &Error{http.StatusConflict, "conflict", "the request conflicts with the current state"}
 	ErrNotFound           = &Error{http.StatusNotFound, "not_found", "resource not found"}
 	ErrForbidden          = &Error{http.StatusForbidden, "forbidden", "you do not have permission to perform this action"}
 	ErrEmailNotVerified   = &Error{http.StatusForbidden, "email_not_verified", "email verification is required for this action"}
 	ErrInsufficientScope  = &Error{http.StatusForbidden, "insufficient_scope", "this token's scope does not permit this action"}
-	ErrInsufficientRole   = &Error{http.StatusForbidden, "insufficient_role", "your role on this list does not permit this action"}
 	ErrQuotaExceeded      = &Error{http.StatusConflict, "quota_exceeded", "resource quota exceeded"}
 	// The code stays "session_required" because it is published in the OpenAPI
 	// document and clients match on it; the message no longer says "session"

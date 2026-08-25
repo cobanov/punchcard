@@ -16,10 +16,11 @@ import (
 )
 
 var knownEventTypes = map[string]bool{
-	events.TypeTaskCreated: true, events.TypeTaskUpdated: true, events.TypeTaskCompleted: true,
-	events.TypeTaskDeleted: true, events.TypeTaskRestored: true,
-	events.TypeListCreated: true, events.TypeListUpdated: true, events.TypeListDeleted: true,
-	events.TypeMemberAdded: true, events.TypeMemberRemoved: true,
+	events.TypeProjectCreated: true, events.TypeProjectUpdated: true,
+	events.TypeProjectArchived: true, events.TypeProjectDeleted: true,
+	events.TypeSessionStarted: true, events.TypeSessionStopped: true,
+	events.TypeSessionUpdated: true, events.TypeSessionDeleted: true,
+	events.TypeCommitsAttached: true, events.TypeGitHubFailed: true,
 }
 
 func validateEventTypes(types []string) error {
@@ -41,11 +42,14 @@ func (d *Domain) requireWebhooks(p *auth.Principal) error {
 	return nil
 }
 
-// CreateWebhook registers a webhook on a list (owner only, verified email).
+// CreateWebhook registers a webhook on the account (verified email required).
 // The returned secret is shown exactly once.
-func (d *Domain) CreateWebhook(ctx context.Context, p *auth.Principal, listID uuid.UUID, url string, eventTypes []string, ip string) (db.Webhook, string, error) {
-	if _, err := d.authorizeList(ctx, p, listID, RoleOwner, true); err != nil {
-		return db.Webhook{}, "", err
+//
+// Scoped to the account rather than to a container: punchcard has no sharing,
+// so "the events I can see" and "the events on my account" are the same set.
+func (d *Domain) CreateWebhook(ctx context.Context, p *auth.Principal, url string, eventTypes []string, ip string) (db.Webhook, string, error) {
+	if !p.CanWrite() {
+		return db.Webhook{}, "", ErrInsufficientScope
 	}
 	if err := d.requireWebhooks(p); err != nil {
 		return db.Webhook{}, "", err
@@ -56,11 +60,11 @@ func (d *Domain) CreateWebhook(ctx context.Context, p *auth.Principal, listID uu
 	if err := validateEventTypes(eventTypes); err != nil {
 		return db.Webhook{}, "", err
 	}
-	n, err := d.store.CountWebhooksForList(ctx, listID)
+	n, err := d.store.CountWebhooksForUser(ctx, p.UserID)
 	if err != nil {
 		return db.Webhook{}, "", fmt.Errorf("count webhooks: %w", err)
 	}
-	if int(n) >= d.cfg.MaxWebhooksPerList {
+	if int(n) >= d.cfg.MaxWebhooksPerUser {
 		return db.Webhook{}, "", ErrQuotaExceeded
 	}
 
@@ -81,24 +85,20 @@ func (d *Domain) CreateWebhook(ctx context.Context, p *auth.Principal, listID uu
 	if err != nil {
 		return db.Webhook{}, "", err
 	}
-	created := p.UserID
 	wh, err := d.store.CreateWebhook(ctx, db.CreateWebhookParams{
-		ID: id, ListID: listID, Url: url, SecretEncrypted: enc, Events: evJSON, CreatedBy: &created,
+		ID: id, UserID: p.UserID, Url: url, SecretEncrypted: enc, Events: evJSON,
 	})
 	if err != nil {
 		return db.Webhook{}, "", fmt.Errorf("create webhook: %w", err)
 	}
-	d.audit.Record(ctx, &p.UserID, audit.ActionWebhookChange, ip, map[string]any{"webhook_id": wh.ID, "list_id": listID, "action": "create"})
+	d.audit.Record(ctx, &p.UserID, audit.ActionWebhookChange, ip, map[string]any{"webhook_id": wh.ID, "action": "create"})
 	return wh, secret, nil
 }
 
-// ListWebhooks returns a list's webhooks (owner only).
-func (d *Domain) ListWebhooks(ctx context.Context, p *auth.Principal, listID uuid.UUID) ([]db.Webhook, error) {
-	if _, err := d.authorizeList(ctx, p, listID, RoleOwner, false); err != nil {
-		return nil, err
-	}
-	whs, err := d.store.ListWebhooksForList(ctx, db.ListWebhooksForListParams{
-		ListID: listID, Lim: quotaLimit(d.cfg.MaxWebhooksPerList),
+// ListWebhooks returns the account's webhooks.
+func (d *Domain) ListWebhooks(ctx context.Context, p *auth.Principal) ([]db.Webhook, error) {
+	whs, err := d.store.ListWebhooksForUser(ctx, db.ListWebhooksForUserParams{
+		UserID: p.UserID, Lim: quotaLimit(d.cfg.MaxWebhooksPerUser),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list webhooks: %w", err)
@@ -106,7 +106,7 @@ func (d *Domain) ListWebhooks(ctx context.Context, p *auth.Principal, listID uui
 	return whs, nil
 }
 
-// getOwnedWebhook loads a webhook and verifies the principal owns its list.
+// getOwnedWebhook loads a webhook and verifies the principal owns it.
 func (d *Domain) getOwnedWebhook(ctx context.Context, p *auth.Principal, webhookID uuid.UUID, write bool) (db.Webhook, error) {
 	wh, err := d.store.GetWebhook(ctx, webhookID)
 	if err != nil {
@@ -115,8 +115,11 @@ func (d *Domain) getOwnedWebhook(ctx context.Context, p *auth.Principal, webhook
 		}
 		return db.Webhook{}, fmt.Errorf("get webhook: %w", err)
 	}
-	if _, err := d.authorizeList(ctx, p, wh.ListID, RoleOwner, write); err != nil {
+	if wh.UserID != p.UserID {
 		return db.Webhook{}, ErrNotFound // hide existence from non-owners
+	}
+	if write && !p.CanWrite() {
+		return db.Webhook{}, ErrInsufficientScope
 	}
 	return wh, nil
 }
@@ -158,7 +161,7 @@ func (d *Domain) DeleteWebhook(ctx context.Context, p *auth.Principal, webhookID
 	if err != nil {
 		return err
 	}
-	if _, err := d.store.DeleteWebhook(ctx, db.DeleteWebhookParams{ID: wh.ID, ListID: wh.ListID}); err != nil {
+	if _, err := d.store.DeleteWebhook(ctx, db.DeleteWebhookParams{ID: wh.ID, UserID: wh.UserID}); err != nil {
 		return fmt.Errorf("delete webhook: %w", err)
 	}
 	d.audit.Record(ctx, &p.UserID, audit.ActionWebhookChange, ip, map[string]any{"webhook_id": wh.ID, "action": "delete"})

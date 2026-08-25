@@ -127,33 +127,31 @@ func (d *Dispatcher) processOutbox(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		// Memoize per-list webhooks: a batch is often dominated by events for a
-		// single active list, so fetch each list's webhooks at most once instead
-		// of once per event (N+1).
+		// Memoize per-account webhooks: a batch is usually dominated by one
+		// active user, so fetch each user's webhooks at most once instead of
+		// once per event (N+1).
 		whCache := make(map[uuid.UUID][]db.Webhook)
 		for _, ev := range evs {
-			if ev.ListID != nil {
-				whs, ok := whCache[*ev.ListID]
-				if !ok {
-					whs, err = q.ListActiveWebhooksForList(ctx, db.ListActiveWebhooksForListParams{
-						ListID: *ev.ListID, Lim: clampI32(d.maxWebhooks),
-					})
-					if err != nil {
-						return err
-					}
-					whCache[*ev.ListID] = whs
+			whs, ok := whCache[ev.UserID]
+			if !ok {
+				whs, err = q.ListActiveWebhooksForUser(ctx, db.ListActiveWebhooksForUserParams{
+					UserID: ev.UserID, Lim: clampI32(d.maxWebhooks),
+				})
+				if err != nil {
+					return err
 				}
-				for _, wh := range whs {
-					if !subscribed(wh.Events, ev.Type) {
-						continue
-					}
-					id, err := uuid.NewV7()
-					if err != nil {
-						return err
-					}
-					if _, err := q.CreateDelivery(ctx, db.CreateDeliveryParams{ID: id, WebhookID: wh.ID, EventID: ev.ID}); err != nil {
-						return err
-					}
+				whCache[ev.UserID] = whs
+			}
+			for _, wh := range whs {
+				if !subscribed(wh.Events, ev.Type) {
+					continue
+				}
+				id, err := uuid.NewV7()
+				if err != nil {
+					return err
+				}
+				if _, err := q.CreateDelivery(ctx, db.CreateDeliveryParams{ID: id, WebhookID: wh.ID, EventID: ev.ID}); err != nil {
+					return err
 				}
 			}
 			if err := q.MarkEventProcessed(ctx, ev.ID); err != nil {

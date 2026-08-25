@@ -3,8 +3,6 @@ package http
 import (
 	"net/http"
 	"strings"
-
-	"github.com/cobanov/punchcard/internal/auth"
 )
 
 const (

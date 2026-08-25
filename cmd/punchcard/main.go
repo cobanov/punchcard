@@ -102,7 +102,7 @@ func cmdServe(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		dispatcher := webhooks.NewDispatcher(store, cipher, logger, cfg.WebhookAllowHTTP, cfg.WebhookMaxConcurrency, cfg.WebhookAutoDisableThreshold, cfg.WebhookPollInterval, cfg.MaxWebhooksPerList)
+		dispatcher := webhooks.NewDispatcher(store, cipher, logger, cfg.WebhookAllowHTTP, cfg.WebhookMaxConcurrency, cfg.WebhookAutoDisableThreshold, cfg.WebhookPollInterval, cfg.MaxWebhooksPerUser)
 		go dispatcher.Run(ctx)
 	} else {
 		logger.Warn("WEBHOOK_ENCRYPTION_KEY not set; webhook features disabled")
@@ -111,8 +111,16 @@ func cmdServe(ctx context.Context) error {
 	janitor := repo.NewJanitor(store, logger, cfg.JanitorInterval)
 	go janitor.Run(ctx)
 
+	ghCipher, err := service.NewGitHubCipher(cfg.GitHubTokenKey)
+	if err != nil {
+		return err
+	}
+	if ghCipher == nil {
+		logger.Warn("GITHUB_TOKEN_KEY not set; GitHub commit matching disabled")
+	}
+
 	authSvc := service.NewAuth(store, sender, auditor, logger, cfg)
-	domainSvc := service.NewDomain(store, auditor, sender, cipher, logger, cfg)
+	domainSvc := service.NewDomain(store, auditor, sender, cipher, ghCipher, logger, cfg)
 	oauthProviders := oauth.New(cfg)
 	logger.Info("social login providers",
 		"google", cfg.GoogleOAuthEnabled(), "github", cfg.GitHubOAuthEnabled())

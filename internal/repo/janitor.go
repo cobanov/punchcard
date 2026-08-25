@@ -52,10 +52,8 @@ func (j *Janitor) sweep(ctx context.Context) {
 		run  func(context.Context) (int64, error)
 	}
 	for _, jb := range []job{
-		{"purge_deleted_tasks", j.store.PurgeDeletedTasks},
 		{"purge_old_events", j.store.PurgeOldEvents},
 		{"purge_idempotency_keys", j.store.DeleteExpiredIdempotencyKeys},
-		{"purge_old_activity", j.store.PurgeOldActivity},
 	} {
 		n, err := jb.run(ctx)
 		if err != nil {

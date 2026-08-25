@@ -98,6 +98,11 @@ type Config struct {
 	GitHubClientID     string `env:"GITHUB_CLIENT_ID"`
 	GitHubClientSecret string `env:"GITHUB_CLIENT_SECRET"`
 
+	// GitHubTokenKey is the base64-encoded 32-byte AES key that seals stored
+	// GitHub access tokens. Without it the GitHub integration stays off; there
+	// is no plaintext fallback.
+	GitHubTokenKey string `env:"GITHUB_TOKEN_KEY"`
+
 	// Sign in with Apple. There is no static secret: APPLE_PRIVATE_KEY is the
 	// PKCS#8 PEM of the .p8 the developer portal downloads once, and the client
 	// secret is a JWT signed with it per request. APPLE_CLIENT_ID is the
@@ -159,10 +164,9 @@ type Config struct {
 
 	// --- Quotas (generous defaults) ---
 	MaxPATsPerUser     int `env:"MAX_PATS_PER_USER" envDefault:"25"`
-	MaxListsPerUser    int `env:"MAX_LISTS_PER_USER" envDefault:"200"`
-	MaxTasksPerList    int `env:"MAX_TASKS_PER_LIST" envDefault:"10000"`
+	MaxProjectsPerUser int `env:"MAX_PROJECTS_PER_USER" envDefault:"500"`
 	MaxMembersPerList  int `env:"MAX_MEMBERS_PER_LIST" envDefault:"50"`
-	MaxWebhooksPerList int `env:"MAX_WEBHOOKS_PER_LIST" envDefault:"10"`
+	MaxWebhooksPerUser int `env:"MAX_WEBHOOKS_PER_USER" envDefault:"10"`
 	MaxInvitesPerUser  int `env:"MAX_PENDING_INVITES_PER_USER" envDefault:"100"`
 }
 

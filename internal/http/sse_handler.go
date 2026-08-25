@@ -9,8 +9,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/cobanov/punchcard/internal/auth"
-	"github.com/cobanov/punchcard/internal/events"
 	"github.com/cobanov/punchcard/internal/repo/db"
 )
 
@@ -70,14 +68,18 @@ func (d Deps) handleSSE() http.HandlerFunc {
 		_ = rc.SetWriteDeadline(time.Time{})
 		_ = rc.SetReadDeadline(time.Time{})
 
-		var filterList *uuid.UUID
-		if q := r.URL.Query().Get("list_id"); q != "" {
+		var filterProject *uuid.UUID
+		if q := r.URL.Query().Get("project_id"); q != "" {
 			id, err := uuid.Parse(q)
 			if err != nil {
-				writeProblem(w, http.StatusUnprocessableEntity, "validation_failed", "list_id must be a uuid")
+				writeProblem(w, http.StatusUnprocessableEntity, "validation_failed", "project_id must be a uuid")
 				return
 			}
-			filterList = &id
+			if !p.AllowsProject(id) {
+				writeProblem(w, http.StatusNotFound, "not_found", "resource not found")
+				return
+			}
+			filterProject = &id
 		}
 
 		if !d.sseHub.acquire(p.UserID) {
@@ -124,26 +126,6 @@ func (d Deps) handleSSE() http.HandlerFunc {
 		beatT := time.NewTicker(25 * time.Second)
 		defer beatT.Stop()
 
-		// The set of accessible lists rarely changes, so cache it instead of
-		// re-querying (lists JOIN list_members) every poll tick. It is refreshed
-		// at least every membershipTTL — which bounds how long a revoked user
-		// keeps receiving a list's events — and immediately after any membership
-		// change reaches this stream (member.*/list.deleted).
-		const membershipTTL = 30 * time.Second
-		var (
-			accessibleIDs []uuid.UUID
-			idsFetched    time.Time // zero => needs a refresh
-		)
-		refreshIDs := func() bool {
-			ids, err := d.Store.ListAccessibleListIDs(ctx, p.UserID)
-			if err != nil {
-				return false
-			}
-			accessibleIDs = allowedListIDs(ids, p, filterList)
-			idsFetched = time.Now()
-			return true
-		}
-
 		for {
 			select {
 			case <-ctx.Done():
@@ -152,26 +134,22 @@ func (d Deps) handleSSE() http.HandlerFunc {
 				_, _ = fmt.Fprint(w, ": keepalive\n\n")
 				flusher.Flush()
 			case <-pollT.C:
-				if idsFetched.IsZero() || time.Since(idsFetched) >= membershipTTL {
-					if !refreshIDs() {
-						continue
-					}
-				}
-				if len(accessibleIDs) == 0 {
-					continue
-				}
-				evs, err := d.Store.ListEventsForListsAfterSeq(ctx, db.ListEventsForListsAfterSeqParams{
-					ListIds: accessibleIDs, AfterSeq: cursor, GraceSecs: grace, Lim: 200,
+				// Events are scoped to the account, so unlike helva there is no
+				// membership set to cache or invalidate: the stream is exactly
+				// the caller's own feed.
+				evs, err := d.Store.ListEventsForUserAfterSeq(ctx, db.ListEventsForUserAfterSeqParams{
+					UserID: p.UserID, AfterSeq: cursor, GraceSecs: grace, Lim: 200,
 				})
 				if err != nil {
 					continue
 				}
 				for _, ev := range evs {
+					if filterProject != nil && (ev.ProjectID == nil || *ev.ProjectID != *filterProject) {
+						cursor = ev.Seq
+						continue
+					}
 					_, _ = fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", ev.Seq, ev.Type, ev.Payload)
 					cursor = ev.Seq
-					if ev.Type == events.TypeMemberAdded || ev.Type == events.TypeMemberRemoved || ev.Type == events.TypeListDeleted {
-						idsFetched = time.Time{} // membership may have changed; refresh next tick
-					}
 				}
 				if len(evs) > 0 {
 					flusher.Flush()
@@ -179,20 +157,4 @@ func (d Deps) handleSSE() http.HandlerFunc {
 			}
 		}
 	}
-}
-
-// allowedListIDs filters accessible list ids by the token's list scope and the
-// optional list_id query filter.
-func allowedListIDs(ids []uuid.UUID, p *auth.Principal, filter *uuid.UUID) []uuid.UUID {
-	out := ids[:0]
-	for _, id := range ids {
-		if filter != nil && id != *filter {
-			continue
-		}
-		if !p.AllowsList(id) {
-			continue
-		}
-		out = append(out, id)
-	}
-	return out
 }

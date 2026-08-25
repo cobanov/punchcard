@@ -1,5 +1,5 @@
 -- name: CreateAPIToken :one
-INSERT INTO api_tokens (id, user_id, name, token_hash, token_prefix, scope, scoped_list_ids, expires_at, kind)
+INSERT INTO api_tokens (id, user_id, name, token_hash, token_prefix, scope, scoped_project_ids, expires_at, kind)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 

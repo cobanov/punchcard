@@ -141,7 +141,7 @@ func (a *Auth) createOAuthUser(ctx context.Context, id oauth.Identity, email, ip
 			return e
 		}
 		user = u
-		_, e = createListTx(ctx, q, "Inbox", u.ID, true, nil)
+		_, e = createDefaultProjectTx(ctx, q, u.ID)
 		return e
 	})
 	if err != nil {

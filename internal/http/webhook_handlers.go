@@ -14,7 +14,6 @@ import (
 // WebhookDTO is the public webhook (never carries the secret).
 type WebhookDTO struct {
 	ID             string    `json:"id"`
-	ListID         string    `json:"list_id"`
 	URL            string    `json:"url"`
 	Events         []string  `json:"events"`
 	Active         bool      `json:"active"`
@@ -26,7 +25,7 @@ func webhookDTO(w db.Webhook) WebhookDTO {
 	evs := []string{}
 	_ = json.Unmarshal(w.Events, &evs)
 	return WebhookDTO{
-		ID: w.ID.String(), ListID: w.ListID.String(), URL: w.Url, Events: evs,
+		ID: w.ID.String(), URL: w.Url, Events: evs,
 		Active: w.Active, DisabledReason: w.DisabledReason, CreatedAt: w.CreatedAt,
 	}
 }
@@ -65,7 +64,7 @@ type webhookBody struct {
 
 func (d Deps) registerWebhookRoutes(api huma.API) {
 	huma.Register(api, huma.Operation{
-		OperationID: "webhooks-list", Method: http.MethodGet, Path: "/v1/lists/{id}/webhooks",
+		OperationID: "webhooks-list", Method: http.MethodGet, Path: "/v1/webhooks",
 		Summary: "List webhooks on a list", Tags: []string{"webhooks"}, Errors: []int{401, 403, 404},
 	}, func(ctx context.Context, in *struct {
 		ID string `path:"id" format:"uuid"`
@@ -78,11 +77,7 @@ func (d Deps) registerWebhookRoutes(api huma.API) {
 		if err != nil {
 			return nil, err
 		}
-		id, err := parseUUID(in.ID)
-		if err != nil {
-			return nil, err
-		}
-		whs, err := d.Domain.ListWebhooks(ctx, p, id)
+		whs, err := d.Domain.ListWebhooks(ctx, p)
 		if err != nil {
 			return nil, d.problem(ctx, err)
 		}
@@ -99,7 +94,7 @@ func (d Deps) registerWebhookRoutes(api huma.API) {
 	})
 
 	huma.Register(api, huma.Operation{
-		OperationID: "webhooks-create", Method: http.MethodPost, Path: "/v1/lists/{id}/webhooks",
+		OperationID: "webhooks-create", Method: http.MethodPost, Path: "/v1/webhooks",
 		Summary: "Create a webhook", Tags: []string{"webhooks"}, DefaultStatus: http.StatusCreated,
 		Errors: []int{401, 403, 404, 409, 422, 503},
 	}, func(ctx context.Context, in *struct {
@@ -118,11 +113,7 @@ func (d Deps) registerWebhookRoutes(api huma.API) {
 		if err != nil {
 			return nil, err
 		}
-		id, err := parseUUID(in.ID)
-		if err != nil {
-			return nil, err
-		}
-		wh, secret, err := d.Domain.CreateWebhook(ctx, p, id, in.Body.URL, in.Body.Events, clientIP(ctx))
+		wh, secret, err := d.Domain.CreateWebhook(ctx, p, in.Body.URL, in.Body.Events, clientIP(ctx))
 		if err != nil {
 			return nil, d.problem(ctx, err)
 		}

@@ -250,10 +250,10 @@ func (d Deps) registerMeRoutes(api huma.API) {
 		DefaultStatus: http.StatusCreated, Errors: []int{401, 403, 409, 422},
 	}, func(ctx context.Context, in *struct {
 		Body struct {
-			Name          string     `json:"name" minLength:"1" maxLength:"100"`
-			Scope         string     `json:"scope" enum:"read,read_write"`
-			ScopedListIDs []string   `json:"scoped_list_ids,omitempty" doc:"Restrict to these list ids; omit for all."`
-			ExpiresAt     *time.Time `json:"expires_at,omitempty" doc:"Optional expiry, RFC 3339 UTC."`
+			Name             string     `json:"name" minLength:"1" maxLength:"100"`
+			Scope            string     `json:"scope" enum:"read,read_write"`
+			ScopedProjectIDs []string   `json:"scoped_list_ids,omitempty" doc:"Restrict to these list ids; omit for all."`
+			ExpiresAt        *time.Time `json:"expires_at,omitempty" doc:"Optional expiry, RFC 3339 UTC."`
 		}
 	}) (*struct {
 		Body struct {
@@ -265,8 +265,8 @@ func (d Deps) registerMeRoutes(api huma.API) {
 		if err != nil {
 			return nil, err
 		}
-		listIDs := make([]uuid.UUID, 0, len(in.Body.ScopedListIDs))
-		for _, s := range in.Body.ScopedListIDs {
+		listIDs := make([]uuid.UUID, 0, len(in.Body.ScopedProjectIDs))
+		for _, s := range in.Body.ScopedProjectIDs {
 			id, perr := uuid.Parse(s)
 			if perr != nil {
 				return nil, NewProblem(422, "validation_failed", "scoped_list_ids must be valid uuids")
@@ -274,7 +274,7 @@ func (d Deps) registerMeRoutes(api huma.API) {
 			listIDs = append(listIDs, id)
 		}
 		tok, secret, err := d.Auth.CreateToken(ctx, p, service.CreateTokenInput{
-			Name: in.Body.Name, Scope: in.Body.Scope, ScopedListIDs: listIDs, ExpiresAt: in.Body.ExpiresAt,
+			Name: in.Body.Name, Scope: in.Body.Scope, ScopedProjectIDs: listIDs, ExpiresAt: in.Body.ExpiresAt,
 		}, clientIP(ctx))
 		if err != nil {
 			return nil, d.problem(ctx, err)

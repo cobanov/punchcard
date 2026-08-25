@@ -1,19 +1,19 @@
 -- name: CreateWebhook :one
-INSERT INTO webhooks (id, list_id, url, secret_encrypted, events, created_by)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO webhooks (id, user_id, url, secret_encrypted, events)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
--- name: ListWebhooksForList :many
-SELECT * FROM webhooks WHERE list_id = @list_id ORDER BY created_at DESC LIMIT @lim;
+-- name: ListWebhooksForUser :many
+SELECT * FROM webhooks WHERE user_id = @user_id ORDER BY created_at DESC LIMIT @lim;
 
 -- name: GetWebhook :one
 SELECT * FROM webhooks WHERE id = $1;
 
--- name: ListActiveWebhooksForList :many
-SELECT * FROM webhooks WHERE list_id = @list_id AND active = true LIMIT @lim;
+-- name: ListActiveWebhooksForUser :many
+SELECT * FROM webhooks WHERE user_id = @user_id AND active = true LIMIT @lim;
 
--- name: CountWebhooksForList :one
-SELECT count(*) FROM webhooks WHERE list_id = $1;
+-- name: CountWebhooksForUser :one
+SELECT count(*) FROM webhooks WHERE user_id = $1;
 
 -- name: UpdateWebhook :one
 UPDATE webhooks SET
@@ -30,7 +30,7 @@ RETURNING *;
 UPDATE webhooks SET secret_encrypted = $2 WHERE id = $1 RETURNING *;
 
 -- name: DeleteWebhook :execrows
-DELETE FROM webhooks WHERE id = $1 AND list_id = $2;
+DELETE FROM webhooks WHERE id = $1 AND user_id = $2;
 
 -- name: RecordWebhookSuccess :exec
 UPDATE webhooks SET consecutive_failures = 0 WHERE id = $1;

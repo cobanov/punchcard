@@ -1,6 +1,6 @@
 -- name: InsertEvent :one
-INSERT INTO events (id, type, list_id, actor, payload)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO events (id, type, user_id, project_id, actor, payload)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: GetEvent :one
@@ -22,9 +22,9 @@ UPDATE events SET processed_at = now() WHERE id = $1;
 -- visible; excluding very fresh rows keeps a forward-only cursor from skipping
 -- them permanently.
 
--- name: ListEventsForListsAfterSeq :many
+-- name: ListEventsForUserAfterSeq :many
 SELECT * FROM events
-WHERE list_id = ANY(sqlc.arg(list_ids)::uuid[])
+WHERE user_id = sqlc.arg(user_id)
   AND seq > sqlc.arg(after_seq)
   AND created_at < now() - make_interval(secs => sqlc.arg(grace_secs)::double precision)
 ORDER BY seq ASC

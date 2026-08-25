@@ -41,14 +41,14 @@ func userDTO(u db.User) UserDTO {
 
 // TokenDTO is a personal access token without its secret.
 type TokenDTO struct {
-	ID            string     `json:"id"`
-	Name          string     `json:"name"`
-	Prefix        string     `json:"prefix"`
-	Scope         string     `json:"scope"`
-	ScopedListIDs []string   `json:"scoped_list_ids,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
-	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
-	LastUsedAt    *time.Time `json:"last_used_at,omitempty"`
+	ID               string     `json:"id"`
+	Name             string     `json:"name"`
+	Prefix           string     `json:"prefix"`
+	Scope            string     `json:"scope"`
+	ScopedProjectIDs []string   `json:"scoped_list_ids,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
+	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
+	LastUsedAt       *time.Time `json:"last_used_at,omitempty"`
 }
 
 func tokenDTO(t db.ApiToken) TokenDTO {
@@ -61,8 +61,8 @@ func tokenDTO(t db.ApiToken) TokenDTO {
 		ExpiresAt:  t.ExpiresAt,
 		LastUsedAt: t.LastUsedAt,
 	}
-	for _, id := range t.ScopedListIds {
-		dto.ScopedListIDs = append(dto.ScopedListIDs, id.String())
+	for _, id := range t.ScopedProjectIds {
+		dto.ScopedProjectIDs = append(dto.ScopedProjectIDs, id.String())
 	}
 	return dto
 }
@@ -78,7 +78,7 @@ type SessionDTO struct {
 	Current    bool      `json:"current"`
 }
 
-func sessionDTO(s db.Session, current *uuid.UUID) SessionDTO {
+func sessionDTO(s db.AuthSession, current *uuid.UUID) SessionDTO {
 	return SessionDTO{
 		ID:         s.ID.String(),
 		CreatedAt:  s.CreatedAt,
