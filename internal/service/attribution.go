@@ -439,3 +439,70 @@ func (d *Domain) SessionAttributionNamed(ctx context.Context, p *auth.Principal,
 	}
 	return named, unres, nil
 }
+
+// SummaryByProjectEvidenced is SummaryByProject with the sweep deciding where
+// each second goes. Same range clipping, same totals — the sweep only moves
+// seconds between projects — but a minute the evidence places on beta bills
+// at beta's rate, which is the point of moving it.
+func (d *Domain) SummaryByProjectEvidenced(ctx context.Context, p *auth.Principal, from, to time.Time) ([]ProjectTotal, error) {
+	sessions, err := d.ListSessions(ctx, p, from, to, nil)
+	if err != nil {
+		return nil, err
+	}
+	r, err := d.newResolver(ctx, p.UserID)
+	if err != nil {
+		return nil, err
+	}
+	secs := map[uuid.UUID]int64{}
+	for _, ws := range sessions {
+		// Parity with the SQL summary: a running session has no duration yet.
+		if ws.EndedAt == nil {
+			continue
+		}
+		s, e := ws.StartedAt, *ws.EndedAt
+		if s.Before(from) {
+			s = from
+		}
+		if e.After(to) {
+			e = to
+		}
+		if !e.After(s) {
+			continue
+		}
+		spans, serr := d.sessionSpans(ctx, r, ws.ID)
+		if serr != nil {
+			return nil, serr
+		}
+		allocs, _ := apportion(ws.ProjectID, s, e, spans)
+		for _, a := range allocs {
+			secs[a.ProjectID] += a.Seconds
+		}
+	}
+
+	out := make([]ProjectTotal, 0, len(secs))
+	for id, seconds := range secs {
+		if !p.AllowsProject(id) {
+			continue
+		}
+		proj, ok := r.projects[id]
+		if !ok {
+			continue
+		}
+		color := ""
+		if proj.Color != nil {
+			color = *proj.Color
+		}
+		out = append(out, ProjectTotal{
+			ProjectID: id, Name: proj.Name, Client: proj.Client, Color: color,
+			Seconds: seconds, Currency: proj.Currency, Billable: proj.Billable,
+			AmountCents: amountCents(seconds, proj.HourlyRateCents, proj.Billable),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Seconds != out[j].Seconds {
+			return out[i].Seconds > out[j].Seconds
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out, nil
+}

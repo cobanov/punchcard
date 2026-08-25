@@ -4801,6 +4801,21 @@
               ],
               "type": "string"
             }
+          },
+          {
+            "description": "How project totals are attributed. 'declared' bills every second to the session's own project. 'evidence' partitions each session across the projects its evidence shows active — quiet minutes still follow the declaration. Day totals are identical in both modes.",
+            "explode": false,
+            "in": "query",
+            "name": "attribution",
+            "schema": {
+              "default": "declared",
+              "description": "How project totals are attributed. 'declared' bills every second to the session's own project. 'evidence' partitions each session across the projects its evidence shows active — quiet minutes still follow the declaration. Day totals are identical in both modes.",
+              "enum": [
+                "declared",
+                "evidence"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {

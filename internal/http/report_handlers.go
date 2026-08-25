@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
+
+	"github.com/cobanov/punchcard/internal/service"
 )
 
 // ProjectTotalDTO is one project's share of a reporting range.
@@ -31,9 +33,10 @@ func (d Deps) registerReportRoutes(api huma.API) {
 		Summary: "Totals for a date range, by project or by day", Tags: []string{"reports"},
 		Errors: []int{401, 422},
 	}, func(ctx context.Context, in *struct {
-		From    string `query:"from" doc:"RFC 3339; defaults to 30 days ago."`
-		To      string `query:"to" doc:"RFC 3339; defaults to now."`
-		GroupBy string `query:"group_by" enum:"project,day" default:"project"`
+		From        string `query:"from" doc:"RFC 3339; defaults to 30 days ago."`
+		To          string `query:"to" doc:"RFC 3339; defaults to now."`
+		GroupBy     string `query:"group_by" enum:"project,day" default:"project"`
+		Attribution string `query:"attribution" enum:"declared,evidence" default:"declared" doc:"How project totals are attributed. 'declared' bills every second to the session's own project. 'evidence' partitions each session across the projects its evidence shows active — quiet minutes still follow the declaration. Day totals are identical in both modes."`
 	}) (*struct {
 		Body struct {
 			From     string `json:"from"`
@@ -88,7 +91,13 @@ func (d Deps) registerReportRoutes(api huma.API) {
 			return out, nil
 		}
 
-		totals, terr := d.Domain.SummaryByProject(ctx, p, from, to)
+		var totals []service.ProjectTotal
+		var terr error
+		if in.Attribution == "evidence" {
+			totals, terr = d.Domain.SummaryByProjectEvidenced(ctx, p, from, to)
+		} else {
+			totals, terr = d.Domain.SummaryByProject(ctx, p, from, to)
+		}
 		if terr != nil {
 			return nil, d.problem(ctx, terr)
 		}
