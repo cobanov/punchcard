@@ -36,6 +36,12 @@ type Identity struct {
 	Email          string
 	Name           string
 	EmailVerified  bool
+
+	// AccessToken and GrantedScopes are what the provider actually handed over.
+	// Only the GitHub connection uses them, and only to store an encrypted
+	// token for the commit scanner. Never log either field.
+	AccessToken   string
+	GrantedScopes string
 }
 
 // Provider wires one social-login provider: its oauth2 config plus the
@@ -146,6 +152,13 @@ func (p *Provider) AuthCodeURL(state string) string {
 }
 
 // Exchange swaps an authorization code for a verified Identity.
+//
+// The identity carries the raw access token. Sign-in itself has no use for it —
+// but punchcard's GitHub scanner does, and asking the user to authorize twice
+// (once to sign in, once to read commits) for the same provider would be a
+// worse experience than storing what the one authorization already granted.
+// Callers that do not need it simply ignore the field; nothing persists it
+// except Domain.ConnectGitHub, which encrypts it first.
 func (p *Provider) Exchange(ctx context.Context, code string) (Identity, error) {
 	if p.apple != nil {
 		return exchangeApple(ctx, *p.apple, code)
@@ -159,7 +172,25 @@ func (p *Provider) Exchange(ctx context.Context, code string) (Identity, error) 
 		return Identity{}, err
 	}
 	id.Provider = p.name
+	id.AccessToken = tok.AccessToken
+	// GitHub returns the granted scopes on the token response; they can be
+	// narrower than what was asked for, because the user may decline.
+	if raw, ok := tok.Extra("scope").(string); ok {
+		id.GrantedScopes = raw
+	}
 	return id, nil
+}
+
+// AuthCodeURLWithScopes is AuthCodeURL with extra scopes merged in, used by the
+// "connect GitHub for commit matching" flow to ask for `repo` on top of the
+// sign-in scopes.
+func (p *Provider) AuthCodeURLWithScopes(state string, extra ...string) string {
+	if p.apple != nil || len(extra) == 0 {
+		return p.AuthCodeURL(state)
+	}
+	widened := *p.conf
+	widened.Scopes = append(append([]string{}, p.conf.Scopes...), extra...)
+	return widened.AuthCodeURL(state)
 }
 
 // fetchGoogle reads the OIDC userinfo endpoint. Google returns email_verified

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"math"
+	"net/http"
 
 	"github.com/google/uuid"
 
@@ -43,6 +44,18 @@ type Domain struct {
 	github *GitHubCipher    // nil when GITHUB_TOKEN_KEY is not set
 	log    *slog.Logger
 	cfg    *config.Config
+
+	// githubBaseURL and githubHTTP exist so tests can point the scanner at a
+	// fake API. In production both stay at their zero values and the client
+	// falls back to api.github.com with its own timeout.
+	githubBaseURL string
+	githubHTTP    *http.Client
+}
+
+// UseGitHubAPI points the GitHub client at a different base URL and HTTP client.
+// Only tests call it; production uses the defaults.
+func (d *Domain) UseGitHubAPI(baseURL string, client *http.Client) {
+	d.githubBaseURL, d.githubHTTP = baseURL, client
 }
 
 // NewDomain builds the domain service. cipher and ghCipher may be nil when the

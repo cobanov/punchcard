@@ -7,13 +7,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 
 	"github.com/cobanov/punchcard/internal/auth"
 	"github.com/cobanov/punchcard/internal/oauth"
+	"github.com/cobanov/punchcard/internal/service"
 )
 
 // oauthStateCookieName carries the anti-CSRF state through the provider round
@@ -73,11 +76,21 @@ func (d Deps) handleOAuthStart() http.HandlerFunc {
 				"|" + base64.RawURLEncoding.EncodeToString([]byte(client))
 		}
 		http.SetCookie(w, d.oauthStateCookie(val, p.UsesFormPost()))
+		// `?scope=repo` on the GitHub provider is the "connect for commit
+		// matching" flow: the same authorization that signs the user in also
+		// grants the scanner read access, so nobody is asked to authorize the
+		// same provider twice. Anything else is ignored — the set of scopes this
+		// service will ever ask for is closed, so nothing user-supplied reaches
+		// the URL.
+		var extra []string
+		if p.Name() == oauth.ProviderGitHub && r.URL.Query().Get("scope") == service.GitHubScope {
+			extra = append(extra, service.GitHubScope)
+		}
 		// #nosec G710 -- the destination is a provider authorization endpoint from
 		// a statically-configured oauth2.Endpoint (accounts.google.com /
 		// github.com). The user only selects among configured providers; the target
 		// host is never user-controlled.
-		http.Redirect(w, r, p.AuthCodeURL(nonce), http.StatusFound)
+		http.Redirect(w, r, p.AuthCodeURLWithScopes(nonce, extra...), http.StatusFound)
 	}
 }
 
@@ -154,6 +167,7 @@ func (d Deps) handleOAuthCallback() http.HandlerFunc {
 		}
 		http.SetCookie(w, ptr(d.sessionCookie(sess.Token, sess.ExpiresAt)))
 		d.Logger.InfoContext(ctx, "oauth login", "provider", provider, "user_id", user.ID)
+		d.connectGitHubIfGranted(ctx, user.ID, id)
 		http.Redirect(w, r, "/", http.StatusFound)
 	}
 }
@@ -287,3 +301,23 @@ func (d Deps) clearedOAuthStateCookie() *http.Cookie {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// connectGitHubIfGranted stores the GitHub connection when the sign-in the user
+// just completed carried the commit-reading scope.
+//
+// Failure here is deliberately not fatal to the login: the user asked to sign
+// in, and refusing them a session because the optional integration could not be
+// saved would be the wrong trade. The reason is logged and the connection stays
+// absent, which the status endpoint reports honestly.
+func (d Deps) connectGitHubIfGranted(ctx context.Context, userID uuid.UUID, id oauth.Identity) {
+	if id.Provider != oauth.ProviderGitHub || id.AccessToken == "" {
+		return
+	}
+	if !slices.Contains(strings.Split(id.GrantedScopes, ","), service.GitHubScope) {
+		return
+	}
+	p := &auth.Principal{UserID: userID, ViaSession: true, Scope: auth.ScopeReadWrite}
+	if err := d.Domain.ConnectGitHub(ctx, p, id.ProviderUserID, id.AccessToken, id.GrantedScopes); err != nil {
+		d.Logger.WarnContext(ctx, "could not store github connection", "error", err)
+	}
+}

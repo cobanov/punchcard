@@ -121,6 +121,9 @@ func cmdServe(ctx context.Context) error {
 
 	authSvc := service.NewAuth(store, sender, auditor, logger, cfg)
 	domainSvc := service.NewDomain(store, auditor, sender, cipher, ghCipher, logger, cfg)
+	scanner := service.NewScanner(domainSvc, logger, cfg.ScanInterval, cfg.ScanRequeueInterval)
+	go scanner.Run(ctx)
+
 	oauthProviders := oauth.New(cfg)
 	logger.Info("social login providers",
 		"google", cfg.GoogleOAuthEnabled(), "github", cfg.GitHubOAuthEnabled())

@@ -1,12 +1,10 @@
-// Janitor runs the retention jobs the schema comments promise: hard-purging
-// soft-deleted tasks after 30 days, dropping outbox events past the offline
-// sync horizon (30 days — see docs/offline-sync.md; long-offline clients get a
-// reset), expiring idempotency keys after 24 hours, and purging activity log
-// rows after 400 days — long enough to compare against the same month last
-// year, bounded enough that a self-hosted instance does not leak. The
-// retention periods live in the SQL (db/queries); this loop only schedules
-// them. A poll loop matches the webhook dispatcher's deviation pattern (no
-// River yet).
+// Janitor runs the data-retention sweeps: dropping outbox events after 30 days
+// and expiring idempotency keys after 24 hours. The retention periods live in
+// the SQL (db/queries); this loop only schedules them.
+//
+// The GitHub commit scanner is NOT here, even though it is also a periodic job.
+// It has to call the service layer, and internal/repo sits below it — see
+// internal/service/scanner.go.
 package repo
 
 import (

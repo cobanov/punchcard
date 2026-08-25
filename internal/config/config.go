@@ -142,8 +142,17 @@ type Config struct {
 	// order; see db/queries/events.sql.
 	EventGraceWindow time.Duration `env:"EVENT_GRACE_WINDOW" envDefault:"1s"`
 	// JanitorInterval is how often retention jobs run (old event purge, expired
-	// idempotency keys, GitHub re-scans). 0 disables the janitor.
+	// idempotency keys). 0 disables the janitor.
 	JanitorInterval time.Duration `env:"JANITOR_INTERVAL" envDefault:"1h"`
+
+	// ScanInterval is how often the GitHub commit queue is drained. A user who
+	// stops a timer expects the commits shortly after, so this is short.
+	// 0 disables the scanner entirely.
+	ScanInterval time.Duration `env:"SCAN_INTERVAL" envDefault:"1m"`
+	// ScanRequeueInterval is how often finished sessions from the last seven
+	// days go back on the queue, which is what catches commits pushed hours
+	// after they were written.
+	ScanRequeueInterval time.Duration `env:"SCAN_REQUEUE_INTERVAL" envDefault:"1h"`
 
 	// --- Quotas (generous defaults) ---
 	MaxPATsPerUser     int `env:"MAX_PATS_PER_USER" envDefault:"25"`
