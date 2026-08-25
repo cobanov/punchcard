@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -235,5 +236,58 @@ func TestEvidencedSummaryRedistributesWithoutChangingTheTotal(t *testing.T) {
 	unmarshal(t, raw, &def)
 	if defAlpha, _ := get(def, "alpha"); defAlpha != 3600 {
 		t.Fatalf("default mode alpha = %d, want the declared 3600", defAlpha)
+	}
+}
+
+// Evidence-mode CSV: one row per session × project, apportioned seconds, and
+// a basis column so a spreadsheet can tell a declared row from an evidenced one.
+func TestCSVFollowsTheAttributionMode(t *testing.T) {
+	srv, _ := newAuthTestServer(t)
+	base := srv.URL
+	csrf := testCSRF()
+	c, _ := registerActor(t, base, "attr-csv@example.com")
+	alphaID := newProject(t, c, base, csrf, "alpha")
+	_ = newProject(t, c, base, csrf, "beta")
+
+	start := time.Now().UTC().Add(-4 * time.Hour).Truncate(time.Minute)
+	end := start.Add(time.Hour)
+	code, raw := do(t, c, http.MethodPost, base+"/v1/sessions",
+		map[string]any{"project_id": alphaID, "started_at": start.Format(time.RFC3339)}, csrf)
+	must(t, "start", code, http.StatusCreated)
+	var ws struct {
+		ID string `json:"id"`
+	}
+	unmarshal(t, raw, &ws)
+	must(t, "stop", st(t, c, http.MethodPost, base+"/v1/sessions/"+ws.ID+"/stop",
+		map[string]any{"at": end.Format(time.RFC3339)}, csrf), http.StatusOK)
+	must(t, "run", st(t, c, http.MethodPost, base+"/v1/agent-runs",
+		runBody("claude-code", "csv-1", start.Add(10*time.Minute), start.Add(40*time.Minute),
+			map[string]any{"repo": "cobanov/beta"}), csrf), http.StatusAccepted)
+
+	q := "?from=" + start.Add(-time.Minute).Format(time.RFC3339) +
+		"&to=" + end.Add(time.Minute).Format(time.RFC3339)
+
+	code, raw = do(t, c, http.MethodGet, base+"/v1/reports/export.csv"+q+"&attribution=evidence", nil, nil)
+	must(t, "csv", code, http.StatusOK)
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	if !strings.HasSuffix(strings.TrimSpace(lines[0]), ",basis") {
+		t.Fatalf("header missing basis column: %s", lines[0])
+	}
+	if len(lines) != 3 { // header + alpha row + beta row
+		t.Fatalf("want 2 data rows, got %d: %v", len(lines)-1, lines)
+	}
+	var alphaSecs, betaSecs int64
+	for _, line := range lines[1:] {
+		f := strings.Split(line, ",")
+		n, _ := strconv.ParseInt(f[6], 10, 64)
+		switch f[1] {
+		case "alpha":
+			alphaSecs = n
+		case "beta":
+			betaSecs = n
+		}
+	}
+	if alphaSecs != 1800 || betaSecs != 1800 {
+		t.Fatalf("csv split alpha=%d beta=%d, want 1800/1800", alphaSecs, betaSecs)
 	}
 }

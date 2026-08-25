@@ -121,8 +121,9 @@ func (d Deps) registerReportRoutes(api huma.API) {
 		Summary: "Export sessions in a date range as CSV", Tags: []string{"reports"},
 		Errors: []int{401, 422},
 	}, func(ctx context.Context, in *struct {
-		From string `query:"from"`
-		To   string `query:"to"`
+		From        string `query:"from"`
+		To          string `query:"to"`
+		Attribution string `query:"attribution" enum:"declared,evidence" default:"declared"`
 	}) (*huma.StreamResponse, error) {
 		p, err := requirePrincipal(ctx)
 		if err != nil {
@@ -135,7 +136,7 @@ func (d Deps) registerReportRoutes(api huma.API) {
 		return &huma.StreamResponse{Body: func(hctx huma.Context) {
 			hctx.SetHeader("Content-Type", "text/csv; charset=utf-8")
 			hctx.SetHeader("Content-Disposition", `attachment; filename="punchcard-sessions.csv"`)
-			if err := d.Domain.ExportCSV(hctx.Context(), p, from, to, hctx.BodyWriter()); err != nil {
+			if err := d.Domain.ExportCSV(hctx.Context(), p, from, to, in.Attribution, hctx.BodyWriter()); err != nil {
 				d.Logger.ErrorContext(hctx.Context(), "CSV export stream failed", "error", err)
 			}
 		}}, nil

@@ -115,8 +115,15 @@ func (d *Domain) Timezone(ctx context.Context, p *auth.Principal) *time.Location
 	return loc
 }
 
-// ExportCSV writes one row per session, with its commit count.
-func (d *Domain) ExportCSV(ctx context.Context, p *auth.Principal, from, to time.Time, w io.Writer) error {
+// ExportCSV writes the range as rows.
+//
+// In declared mode that is one row per session. In evidence mode it is one row
+// per session and project, with the apportioned seconds billed at the row
+// project's own rate — the export is the freezing mechanism for a report that
+// is otherwise a living view, so it has to be able to say everything the view
+// can. The commits column stays the session's total on each of its rows: it
+// counts evidence, not time.
+func (d *Domain) ExportCSV(ctx context.Context, p *auth.Principal, from, to time.Time, attribution string, w io.Writer) error {
 	sessions, err := d.ListSessions(ctx, p, from, to, nil)
 	if err != nil {
 		return err
@@ -147,11 +154,18 @@ func (d *Domain) ExportCSV(ctx context.Context, p *auth.Principal, from, to time
 		}
 	}
 
+	var res *resolver
+	if attribution == "evidence" {
+		if res, err = d.newResolver(ctx, p.UserID); err != nil {
+			return err
+		}
+	}
+
 	loc := d.Timezone(ctx, p)
 	cw := csv.NewWriter(w)
 	if err := cw.Write([]string{
 		"session_id", "project", "client", "note", "started_at", "ended_at",
-		"seconds", "amount_cents", "currency", "commits", "source",
+		"seconds", "amount_cents", "currency", "commits", "source", "basis",
 	}); err != nil {
 		return err
 	}
@@ -162,26 +176,52 @@ func (d *Domain) ExportCSV(ctx context.Context, p *auth.Principal, from, to time
 		if ws.EndedAt == nil {
 			continue
 		}
-		proj := byID[ws.ProjectID]
-		seconds := int64(ws.EndedAt.Sub(ws.StartedAt).Seconds())
-		amount := ""
-		if a := amountCents(seconds, proj.HourlyRateCents, proj.Billable); a != nil {
-			amount = strconv.FormatInt(*a, 10)
+		if attribution != "evidence" {
+			proj := byID[ws.ProjectID]
+			seconds := int64(ws.EndedAt.Sub(ws.StartedAt).Seconds())
+			amount := ""
+			if a := amountCents(seconds, proj.HourlyRateCents, proj.Billable); a != nil {
+				amount = strconv.FormatInt(*a, 10)
+			}
+			if err := cw.Write([]string{
+				ws.ID.String(), proj.Name, proj.Client, ws.Note,
+				ws.StartedAt.In(loc).Format(time.RFC3339),
+				ws.EndedAt.In(loc).Format(time.RFC3339),
+				strconv.FormatInt(seconds, 10), amount, proj.Currency,
+				strconv.FormatInt(counts[ws.ID], 10), ws.Source, "declared",
+			}); err != nil {
+				return err
+			}
+			continue
 		}
-		if err := cw.Write([]string{
-			ws.ID.String(),
-			proj.Name,
-			proj.Client,
-			ws.Note,
-			ws.StartedAt.In(loc).Format(time.RFC3339),
-			ws.EndedAt.In(loc).Format(time.RFC3339),
-			strconv.FormatInt(seconds, 10),
-			amount,
-			proj.Currency,
-			strconv.FormatInt(counts[ws.ID], 10),
-			ws.Source,
-		}); err != nil {
-			return err
+
+		spans, serr := d.sessionSpans(ctx, res, ws.ID)
+		if serr != nil {
+			return serr
+		}
+		allocs, _ := apportion(ws.ProjectID, ws.StartedAt, *ws.EndedAt, spans)
+		for _, a := range allocs {
+			proj, ok := res.projects[a.ProjectID]
+			if !ok {
+				continue
+			}
+			amount := ""
+			if amt := amountCents(a.Seconds, proj.HourlyRateCents, proj.Billable); amt != nil {
+				amount = strconv.FormatInt(*amt, 10)
+			}
+			basis := "declared"
+			if a.Evidenced {
+				basis = "evidence"
+			}
+			if err := cw.Write([]string{
+				ws.ID.String(), proj.Name, proj.Client, ws.Note,
+				ws.StartedAt.In(loc).Format(time.RFC3339),
+				ws.EndedAt.In(loc).Format(time.RFC3339),
+				strconv.FormatInt(a.Seconds, 10), amount, proj.Currency,
+				strconv.FormatInt(counts[ws.ID], 10), ws.Source, basis,
+			}); err != nil {
+				return err
+			}
 		}
 	}
 	cw.Flush()

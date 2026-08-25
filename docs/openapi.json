@@ -4722,6 +4722,19 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "attribution",
+            "schema": {
+              "default": "declared",
+              "enum": [
+                "declared",
+                "evidence"
+              ],
+              "type": "string"
+            }
           }
         ],
         "responses": {
