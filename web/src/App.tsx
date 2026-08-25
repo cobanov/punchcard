@@ -170,7 +170,15 @@ export function App() {
             onStop={() => act(() => api.stop(current!.id))}
             busy={busy}
           />
-          <div className="mt-8">
+          {/* The day is an object with edges, not text floating on a page.
+              Without the panel the sparse days — which are most days — read as
+              an unfinished screen rather than a quiet one. */}
+          <section className="mt-6 overflow-hidden rounded-lg border border-line bg-card">
+            <header className="flex items-baseline justify-between border-b border-line px-4 py-2.5">
+              <h2 className="eyebrow">Today</h2>
+              <DayTotals sessions={sessions} commits={commits} />
+            </header>
+            <div className="px-4 py-3">
             <DayCard
               sessions={sessions}
               commits={commits}
@@ -188,8 +196,8 @@ export function App() {
                 )
               }
             />
-          </div>
-          <DayFooter sessions={sessions} commits={commits} />
+            </div>
+          </section>
           <GitHubNote status={github} />
         </>
       )}
@@ -201,7 +209,8 @@ export function App() {
   );
 }
 
-function DayFooter({
+/** The day's totals, in the panel header where a total belongs. */
+function DayTotals({
   sessions,
   commits,
 }: {
@@ -209,16 +218,13 @@ function DayFooter({
   commits: Record<string, Commit[]>;
 }) {
   const finished = sessions.filter((s) => !s.running);
-  if (!finished.length) return null;
+  if (!finished.length) return <span className="text-[11px] text-faint">nothing yet</span>;
   const seconds = finished.reduce((sum, s) => sum + s.seconds, 0);
   const count = finished.reduce((sum, s) => sum + (commits[s.id]?.length ?? 0), 0);
   return (
-    <div className="mt-6 flex items-baseline justify-between border-t border-line pt-3 text-dim">
-      <span>{finished.length} sessions</span>
-      <span className="font-mono tabular-nums">
-        {total(seconds)} · {count} commits
-      </span>
-    </div>
+    <span className="tnum font-mono text-[11px] text-dim">
+      {total(seconds)} · {count} commit{count === 1 ? "" : "s"}
+    </span>
   );
 }
 

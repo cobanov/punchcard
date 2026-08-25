@@ -111,12 +111,12 @@ export function DayCard({ sessions, commits, clusters, projects, onRecover, now 
         return (
           <div
             key={session.id}
-            className="absolute left-8 right-0 flex gap-2.5"
-            style={{ top: pos(from - first), height: pos(height) }}
+            className="absolute left-8 right-0 flex gap-2.5 overflow-visible"
+            style={{ top: pos(from - first), minHeight: pos(height) }}
           >
             <div
               className={[
-                "w-[3px] shrink-0 rounded-sm",
+                "w-[5px] shrink-0 rounded-[2px]",
                 running ? "bg-punch" : "bg-ghost",
               ].join(" ")}
               aria-hidden
@@ -159,11 +159,11 @@ export function DayCard({ sessions, commits, clusters, projects, onRecover, now 
         return (
           <div
             key={cluster.from}
-            className="absolute left-8 right-0 flex gap-2.5"
-            style={{ top: pos(from - first), height: pos(Math.max(to - from, 0.09)) }}
+            className="absolute left-8 right-0 flex gap-2.5 overflow-visible"
+            style={{ top: pos(from - first), minHeight: pos(Math.max(to - from, 0.09)) }}
           >
             <div
-              className="w-[3px] shrink-0 rounded-sm border border-dashed border-ghost"
+              className="w-[5px] shrink-0 rounded-[2px] border border-dashed border-ghost"
               aria-hidden
             />
             {/* The punches lead. They are the point: work that happened with
