@@ -21,3 +21,7 @@ coverage.*
 
 # Browser-automation scratch.
 /.playwright-mcp/
+
+# Swift build output (apps/menubar)
+apps/menubar/.build/
+apps/menubar/build/
