@@ -1,82 +1,53 @@
 @import "tailwindcss";
 
-/* IBM Plex, bundled rather than fetched.
- *
- * IBM made the punch card, which is where the product's name and its central
- * image come from — so the typeface is the subject's own rather than a neutral
- * default. Bundling instead of linking a font host keeps a self-hosted instance
- * self-contained: nothing to be unreachable, nothing that breaks offline. */
+/* IBM Plex, bundled rather than fetched. IBM made the punch card — the typeface
+ * is the subject's own — and bundling keeps a self-hosted instance
+ * self-contained: no font host to be unreachable. */
 @import "@fontsource/ibm-plex-sans/400.css";
 @import "@fontsource/ibm-plex-sans/500.css";
 @import "@fontsource/ibm-plex-sans/600.css";
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 
-/* Dark, and only dark.
+/* Zinc, flat, dark.
  *
- * Not a default — a decision. The landing page is dark because the whole visual
- * idea is light coming through punched holes, and that needs a dark room. An
- * app that flipped to white the moment someone signed in would make the product
- * change identity on the way through its own front door, which is exactly what
- * it did until this was removed.
+ * The app is a speed tool: open it, press start, glance at a number, leave. The
+ * earlier warm-graphite palette and its drawn-timeline centerpiece optimised
+ * for being looked at; this optimises for being left. Flat neutral surfaces,
+ * hairline borders, one high-contrast primary button — and amber is still
+ * reserved for exactly one meaning, running time and the commits that prove it,
+ * which is the thread that ties the app to the landing page.
  *
- * A light theme can come back as something a person chooses in settings. It
- * should not arrive because their laptop is set that way. */
+ * Dark only remains a decision, not a default: the front door is dark, and the
+ * product does not change identity on the way in. */
 @theme {
-  /* Cool graphite, one warm accent.
-   *
-   * The first pass mixed a warm ground with a warm accent and landed on the
-   * cream-and-amber look every generated page arrives in. Everything neutral is
-   * cool-tinted now, from one family, so the accent is the only warm thing on
-   * screen — which is what makes it read as light coming through a hole rather
-   * than as decoration. */
-  --color-ink: #0c0d10;
-  --color-card: #131519;
-  --color-raise: #191c21;
-  --color-line: #22252b;
-  --color-line-strong: #2d313a;
-  --color-text: #e8eaee;
-  --color-dim: #868d9a;
-  --color-faint: #565d69;
+  --color-ink: #09090b;
+  --color-card: #131316;
+  --color-raise: #1c1c20;
+  --color-line: #232329;
+  --color-line-strong: #33333b;
+  --color-text: #fafafa;
+  --color-dim: #a1a1aa;
+  --color-faint: #62626b;
   --color-punch: #e9973f;
   --color-punch-deep: #4a3616;
-  --color-ghost: #343943;
-
-  /* Solid buttons are neutral, not amber.
-   *
-   * Amber means one thing in this product — time running, and the evidence of
-   * it. Spending it on chrome as well would make it mean nothing, and on a
-   * light background it turned muddy brown. So the primary action is the
-   * highest-contrast neutral there is, which is also what makes the running
-   * clock the only coloured thing on screen. */
-  --color-solid: #e8eaee;
-  --color-solid-fg: #0c0d10;
+  --color-solid: #fafafa;
+  --color-solid-fg: #09090b;
 
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-
-  /* One hour of the day. Band heights, punch positions and the hour rail are all
-   * derived from it, so the timeline stays honest: two hours is exactly twice
-   * one hour. Tight, because a working day has to fit on a screen. */
-  --hour: 2.25rem;
 }
 
 @layer base {
   html {
     color-scheme: dark;
-    scroll-behavior: smooth;
   }
 
   body {
     @apply bg-ink text-text font-sans antialiased;
-    /* 13px, the density a tool that sits open all day is read at. */
+    /* 13px: the density of a tool that shares a screen with an editor. */
     font-size: 13px;
     line-height: 1.5;
-
-    /* Card stock has grain. A flat vector plane reads as sterile, and this is
-     * the cheapest honest texture there is: one inline SVG, no request, 3%
-     * opacity — felt rather than seen. */
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.032'/%3E%3C/svg%3E");
   }
 
   /* A tool driven from the keyboard cannot hide where the keyboard is. */
@@ -89,27 +60,21 @@
     color: var(--color-ink);
   }
 
-  /* Every number in this interface is compared against another number. */
+  /* Every number here is compared against another number. */
   .tnum,
-  input,
-  td {
+  input {
     font-variant-numeric: tabular-nums;
   }
 }
 
 @layer components {
-  /* One button style, three weights of emphasis. A page where every action is
-   * a filled button has no primary action. */
-  /* Tailwind v4 will not let one component class @apply another, so the shared
-     shape is repeated rather than composed. Repetition here beats a base class
-     nobody can use on its own. */
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded px-2.5 py-1
-           bg-solid font-medium text-solid-fg transition duration-150
+    @apply inline-flex items-center justify-center rounded-md bg-solid px-3 py-1.5
+           font-medium text-solid-fg transition duration-150
            hover:opacity-90 active:scale-[0.98] disabled:opacity-40;
   }
-  .btn-quiet {
-    @apply inline-flex items-center justify-center rounded border border-line
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-md border border-line
            px-2.5 py-1 text-dim transition duration-150
            hover:border-line-strong hover:text-text active:scale-[0.98]
            disabled:opacity-40;
@@ -119,15 +84,19 @@
   }
 
   .field {
-    @apply rounded border border-line bg-card px-2 py-1 text-text outline-none
+    @apply rounded-md border border-line bg-ink px-2 py-1 text-text outline-none
            transition-colors duration-150 placeholder:text-faint
            focus:border-line-strong;
   }
 
-  /* Small, wide-tracked, lowercase. Section labels should name a region without
-   * competing with what is in it. */
+  /* Section labels name a region without competing with what is in it. */
   .eyebrow {
-    @apply text-[11px] font-medium tracking-[0.08em] text-faint uppercase;
+    @apply text-[11px] font-medium uppercase tracking-[0.08em] text-faint;
+  }
+
+  /* The one card shape. Flat — hierarchy comes from the border, not a shadow. */
+  .panel {
+    @apply rounded-lg border border-line bg-card;
   }
 }
 
@@ -140,28 +109,23 @@
   }
 }
 
-/* A commit landing after a scan should be noticed, not announced. */
-@keyframes punch-in {
-  from {
-    opacity: 0;
-    transform: scale(0.3);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-.punch-in {
-  animation: punch-in 220ms cubic-bezier(0.2, 0.8, 0.3, 1);
-}
-
 /* Skeletons match the shape of what is loading, so the page does not jump when
  * the data lands. */
 @keyframes shimmer {
-  0%, 100% { opacity: 0.35; }
-  50%      { opacity: 0.6; }
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.7; }
 }
 .skeleton {
-  @apply rounded bg-raise;
-  animation: shimmer 1.6s ease-in-out infinite;
+  @apply rounded-md bg-raise;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* The running dot. One quiet pulse — the clock next to it already moves once a
+ * second, and two competing rhythms would be noise. */
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+.breathe {
+  animation: breathe 2.4s ease-in-out infinite;
 }

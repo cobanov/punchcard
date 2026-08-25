@@ -5,12 +5,13 @@ import { clock, elapsed, hhmm } from "../lib/format";
 /**
  * The one control that matters.
  *
- * It never leaves the screen, because starting and stopping is what people open
- * punchcard to do. Everything else on the page is read; this is pressed.
+ * Everything else on the page is read; this is pressed. The whole interaction
+ * budget is: type a sentence, Enter. The project defaults to the last one used,
+ * so most starts never touch the select, and `n` reaches the input from
+ * anywhere so the mouse is optional.
  *
- * The running clock is the only large thing in the interface. In a tool where
- * every other number is 11 or 13px, one element at 28px with tight tracking is
- * the whole hierarchy — and it should be the number that is actually moving.
+ * While running, the clock is the only coloured, only large, only moving thing
+ * on the page — which is the entire visual hierarchy this tool needs.
  */
 
 interface Props {
@@ -40,12 +41,13 @@ export function TimerBar({ current, projects, projectName, onStart, onStop, busy
     if (!projectID && projects.length) setProjectID(projects[0]!.id);
   }, [projects, projectID]);
 
-  // `n` focuses the note from anywhere. A tool people live in should be
-  // reachable without the mouse.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
-      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) {
+        if (e.key === "Escape") (e.target as HTMLElement).blur();
+        return;
+      }
       if (e.key === "n") {
         e.preventDefault();
         noteRef.current?.focus();
@@ -57,21 +59,21 @@ export function TimerBar({ current, projects, projectName, onStart, onStop, busy
 
   if (current?.running) {
     return (
-      <section
-        aria-label="Running timer"
-        className="flex items-center gap-4 border-b border-line pb-4"
-      >
-        <span className="tnum font-mono text-[28px] font-medium leading-none tracking-tight text-punch">
+      <section aria-label="Running timer" className="panel flex items-center gap-3 px-4 py-3">
+        <span className="breathe h-2 w-2 shrink-0 rounded-full bg-punch" aria-hidden />
+        <span className="tnum shrink-0 font-mono text-[22px] font-medium leading-none tracking-tight text-punch">
           {clock(elapsed(current))}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate">
+          <p className="truncate leading-tight">
             <span className="font-medium">{projectName(current.project_id)}</span>
             {current.note && <span className="text-dim"> · {current.note}</span>}
           </p>
-          <p className="tnum font-mono text-[11px] text-faint">since {hhmm(current.started_at)}</p>
+          <p className="tnum font-mono text-[10px] leading-tight text-faint">
+            since {hhmm(current.started_at)}
+          </p>
         </div>
-        <button onClick={onStop} disabled={busy} className="btn-primary px-3 py-1.5">
+        <button onClick={onStop} disabled={busy} className="btn-primary">
           Stop
         </button>
       </section>
@@ -79,7 +81,7 @@ export function TimerBar({ current, projects, projectName, onStart, onStop, busy
   }
 
   return (
-    <section aria-label="Start a timer" className="border-b border-line pb-4">
+    <section aria-label="Start a timer" className="panel">
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -87,7 +89,7 @@ export function TimerBar({ current, projects, projectName, onStart, onStop, busy
           await onStart(projectID, note.trim());
           setNote("");
         }}
-        className="flex items-center gap-2"
+        className="flex items-center gap-2 px-3 py-2"
       >
         <input
           ref={noteRef}
@@ -95,16 +97,16 @@ export function TimerBar({ current, projects, projectName, onStart, onStop, busy
           onChange={(e) => setNote(e.target.value)}
           placeholder="What are you working on?"
           aria-label="What are you working on?"
-          className="min-w-0 flex-1 bg-transparent py-1 text-[15px] outline-none placeholder:text-faint"
+          className="min-w-0 flex-1 bg-transparent py-1 text-[14px] outline-none placeholder:text-faint"
         />
-        <kbd className="hidden shrink-0 rounded border border-line px-1 font-mono text-[10px] text-faint sm:block">
+        <kbd className="hidden shrink-0 rounded border border-line px-1.5 font-mono text-[10px] leading-[1.7] text-faint sm:block">
           n
         </kbd>
         <select
           value={projectID}
           onChange={(e) => setProjectID(e.target.value)}
           aria-label="Project"
-          className="field max-w-[11rem]"
+          className="field max-w-[11rem] py-1.5"
         >
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
@@ -112,7 +114,7 @@ export function TimerBar({ current, projects, projectName, onStart, onStop, busy
             </option>
           ))}
         </select>
-        <button type="submit" disabled={busy || !projectID} className="btn-primary px-3 py-1.5">
+        <button type="submit" disabled={busy || !projectID} className="btn-primary">
           Start
         </button>
       </form>

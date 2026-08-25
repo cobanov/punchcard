@@ -15,14 +15,16 @@ export function clock(seconds: number): string {
   return `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
 }
 
-/** A total: `6s 12d`. Nobody bills in seconds. */
+/** A total: `6h 12m`. Nobody bills in seconds — and the landing page already
+ *  speaks in h/m, so the app saying `6s 12d` had the product using two
+ *  vocabularies for one number. */
 export function total(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
-  if (h && m) return `${h}s ${m}d`;
-  if (h) return `${h}s`;
-  return `${m}d`;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
 }
 
 export const hhmm = (iso: string | Date) =>
