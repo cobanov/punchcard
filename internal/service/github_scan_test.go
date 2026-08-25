@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -38,16 +39,38 @@ type fakeGH struct {
 	*httptest.Server
 	mu      sync.Mutex
 	commits map[string][]ghCommit // repo full name -> commits
+	stale   map[string]bool       // repos whose last push is long past
+	paths   []string
 	status  int
 	calls   int
 }
 
 func newFakeGH(t *testing.T) *fakeGH {
 	t.Helper()
-	f := &fakeGH{commits: map[string][]ghCommit{}}
+	f := &fakeGH{commits: map[string][]ghCommit{}, stale: map[string]bool{}}
 	f.Server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.Close)
 	return f
+}
+
+// addStaleRepo registers a repository the account owns but has not pushed to in
+// a long time.
+func (f *fakeGH) addStaleRepo(repo string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.stale[repo] = true
+}
+
+// touched reports whether any request mentioned the repository.
+func (f *fakeGH) touched(repo string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, p := range f.paths {
+		if strings.Contains(p, repo) {
+			return true
+		}
+	}
+	return false
 }
 
 func (f *fakeGH) addCommit(repo, branch, sha string, when time.Time) {
@@ -65,6 +88,7 @@ func (f *fakeGH) failWith(status int) {
 func (f *fakeGH) serve(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	f.calls++
+	f.paths = append(f.paths, r.URL.Path)
 	status := f.status
 	f.mu.Unlock()
 	if status != 0 {
@@ -80,6 +104,38 @@ func (f *fakeGH) serve(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Path == "/user" {
 		_ = json.NewEncoder(w).Encode(map[string]any{"login": "cobanov", "id": 1})
+		return
+	}
+	// Repository discovery: everything with a commit, plus anything explicitly
+	// registered as stale, ordered newest push first like GitHub does.
+	if r.URL.Path == "/user/repos" {
+		f.mu.Lock()
+		fresh := make([]string, 0, len(f.commits))
+		for name := range f.commits {
+			fresh = append(fresh, name)
+		}
+		staleNames := make([]string, 0, len(f.stale))
+		for name := range f.stale {
+			staleNames = append(staleNames, name)
+		}
+		f.mu.Unlock()
+		sort.Strings(fresh)
+		sort.Strings(staleNames)
+
+		out := []map[string]any{}
+		for _, name := range fresh {
+			out = append(out, map[string]any{
+				"full_name": name, "default_branch": "main",
+				"pushed_at": time.Now().UTC().Add(time.Hour).Format(time.RFC3339),
+			})
+		}
+		for _, name := range staleNames {
+			out = append(out, map[string]any{
+				"full_name": name, "default_branch": "main",
+				"pushed_at": time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339),
+			})
+		}
+		_ = json.NewEncoder(w).Encode(out)
 		return
 	}
 	if len(parts) < 3 || parts[0] != "repos" {
@@ -550,5 +606,50 @@ func TestSessionFromClusterRejectsAnOverlappingWindow(t *testing.T) {
 	var de *Error
 	if !asError(err, &de) || de.Status != 409 {
 		t.Fatalf("want 409, got %v", err)
+	}
+}
+
+// Linking a repository to a project must be OPTIONAL.
+//
+// Which session a commit lands in is decided by TIME, not by which project a
+// repository belongs to. Scanning only linked repositories turned an optional
+// refinement into a setup step: a user who connected GitHub and started a timer
+// got nothing, with no error to explain it. The scanner discovers repositories
+// the account pushed to during the window instead.
+func TestCommitsAttachWithoutAnyLinkedRepo(t *testing.T) {
+	e, gh := newGitHubEnv(t)
+	p := e.newUser(t)
+	if err := e.d.ConnectGitHub(e.ctx, p, "cobanov", "ghp_secret_value", GitHubScope); err != nil {
+		t.Fatalf("connect github: %v", err)
+	}
+	proj := e.mustProject(t, p, "p") // deliberately NO LinkRepo
+	ws := e.seedSession(t, p, proj.ID, at("10:00"), at("12:00"))
+	gh.addCommit("cobanov/somewhere", "main", "aaaaaaa", at("11:15"))
+
+	if _, err := e.d.ScanWindow(e.ctx, p.UserID, ws.StartedAt, *ws.EndedAt); err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if got := e.commitSHAs(t, p, ws.ID); len(got) != 1 || got[0] != "aaaaaaa" {
+		t.Fatalf("commits = %v — a commit must attach with no repository linked", got)
+	}
+}
+
+// A repository nobody has pushed to since the window began cannot hold commits
+// inside it, so it is never fetched. This is what keeps discovery cheap.
+func TestDiscoveryIgnoresRepositoriesNotPushedSinceTheWindow(t *testing.T) {
+	e, gh := newGitHubEnv(t)
+	p := e.newUser(t)
+	if err := e.d.ConnectGitHub(e.ctx, p, "cobanov", "ghp_secret_value", GitHubScope); err != nil {
+		t.Fatalf("connect github: %v", err)
+	}
+	proj := e.mustProject(t, p, "p")
+	ws := e.seedSession(t, p, proj.ID, at("10:00"), at("12:00"))
+	gh.addStaleRepo("cobanov/abandoned")
+
+	if _, err := e.d.ScanWindow(e.ctx, p.UserID, ws.StartedAt, *ws.EndedAt); err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if gh.touched("cobanov/abandoned") {
+		t.Fatal("a repository with no pushes since the window began should never be fetched")
 	}
 }

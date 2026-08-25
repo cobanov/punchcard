@@ -71,6 +71,20 @@ to the *next* day in Istanbul. Reports group with
 `date_trunc('day', started_at AT TIME ZONE $tz)`, never on the raw timestamp.
 Everything is stored UTC; only presentation shifts.
 
+### Linking a repository to a project is optional
+
+The scanner asks GitHub which repositories the account pushed to since the
+window began and looks there; explicitly linked repositories are added on top.
+
+It did not start that way, and the mistake is worth remembering: scanning only
+linked repositories turned an optional refinement into a setup step. Connect
+GitHub, start a timer, stop it — and get nothing, with no error to explain it,
+because the scanner had been told to look nowhere. Attribution is decided by
+TIME, so the scanner never needed telling where to look, only when.
+
+What linking is actually for: suggesting which project a stretch of unmatched
+commits belongs to.
+
 ### GitHub's commit listing only sees the default branch
 
 `GET /repos/{o}/{r}/commits` with no `sha` parameter walks the default branch and

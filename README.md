@@ -54,6 +54,10 @@ punchcard stop
 punchcard today
 ```
 
+Linking a repository to a project is optional — the scanner finds the
+repositories you pushed to on its own. Link one when you want punchcard to guess
+which project a stretch of unmatched commits belongs to.
+
 `login` binds a loopback listener, opens the browser at the server's GitHub
 sign-in, and trades the one-time code it gets back for a device token — the
 token itself never passes through the browser, so it never reaches browser

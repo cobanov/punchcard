@@ -21,6 +21,13 @@ var backoff = []time.Duration{
 	time.Minute, 5 * time.Minute, 30 * time.Minute, 2 * time.Hour, 12 * time.Hour,
 }
 
+// maxDiscoveredRepos bounds how many repositories one scan will look at.
+//
+// A cap rather than no cap: an account that pushed to forty repositories in a
+// week is unusual, and forty branch enumerations in one pass is not what a
+// background job should do without someone deciding it should.
+const maxDiscoveredRepos = 25
+
 // RescanWindow is how far back the periodic sweep re-queues finished sessions.
 //
 // This exists for the second GitHub trap: a commit that has not been pushed does
@@ -56,30 +63,53 @@ func (d *Domain) ScanWindow(ctx context.Context, userID uuid.UUID, from, to time
 		return res, nil
 	}
 
-	repos, err := d.store.ListReposForUser(ctx, userID)
+	// Which repositories to look in.
+	//
+	// Linking a repository to a project is OPTIONAL, and this is where that is
+	// made true: the scanner asks GitHub which repositories the account has
+	// pushed to since the window began, and looks there. A user who connects
+	// GitHub and starts a timer gets their commits with no setup at all.
+	//
+	// Explicitly linked repositories are added on top rather than replacing the
+	// discovered set. They serve a different purpose — suggesting which project
+	// a stretch of unmatched commits belongs to — and a user who linked one
+	// still works in others.
+	type repoRef struct {
+		id       *uuid.UUID
+		branches []string
+	}
+	byName := map[string]repoRef{}
+
+	discovered, derr := client.ReposPushedSince(ctx, from, maxDiscoveredRepos)
+	if derr != nil {
+		permanent, msg := classifyGitHubError(derr)
+		d.markGitHubError(ctx, userID, msg)
+		if permanent {
+			return res, permanentGitHubError{msg: msg}
+		}
+		return res, derr
+	}
+	for _, r := range discovered {
+		byName[r.FullName] = repoRef{}
+	}
+
+	linked, err := d.store.ListReposForUser(ctx, userID)
 	if err != nil {
 		return res, fmt.Errorf("list repos: %w", err)
 	}
-	if len(repos) == 0 {
-		return res, nil
-	}
-
-	// Distinct repositories: the same repository can be linked to several
-	// projects, and scanning it twice would only cost quota.
-	type repoRef struct {
-		id       uuid.UUID
-		branches []string
-	}
-	byName := make(map[string]repoRef, len(repos))
-	for _, r := range repos {
-		if _, seen := byName[r.FullName]; seen {
+	for _, r := range linked {
+		if existing, seen := byName[r.FullName]; seen && existing.id != nil {
 			continue
 		}
 		var cached []string
 		if r.BranchesAt != nil && time.Since(*r.BranchesAt) < github.BranchCacheTTL {
 			_ = json.Unmarshal(r.Branches, &cached)
 		}
-		byName[r.FullName] = repoRef{id: r.ID, branches: cached}
+		id := r.ID
+		byName[r.FullName] = repoRef{id: &id, branches: cached}
+	}
+	if len(byName) == 0 {
+		return res, nil
 	}
 
 	for fullName, ref := range byName {
@@ -98,10 +128,12 @@ func (d *Domain) ScanWindow(ctx context.Context, userID uuid.UUID, from, to time
 		}
 		res.ReposScanned++
 
-		if len(scan.Branches) > 0 && len(ref.branches) == 0 {
+		// Only a linked repository has a row to cache the branch list on. A
+		// discovered one is re-listed next time, which costs one request.
+		if ref.id != nil && len(scan.Branches) > 0 && len(ref.branches) == 0 {
 			if payload, merr := json.Marshal(scan.Branches); merr == nil {
 				if uerr := d.store.SetRepoBranches(ctx, db.SetRepoBranchesParams{
-					ID: ref.id, Branches: payload,
+					ID: *ref.id, Branches: payload,
 				}); uerr != nil {
 					d.log.WarnContext(ctx, "could not cache branches", "repo", fullName, "error", uerr.Error())
 				}

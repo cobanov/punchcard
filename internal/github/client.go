@@ -243,3 +243,47 @@ func nextPagePath(link, baseURL string) string {
 	}
 	return ""
 }
+
+// ReposPushedSince lists the repositories the account has pushed to since a
+// point in time, newest push first.
+//
+// This is what makes linking a repository to a project optional. Commit
+// attribution is decided by TIME — which session covers the commit — so the
+// scanner does not need to be told where to look, only when. A repository whose
+// last push predates the window cannot contain a commit inside it.
+//
+// GitHub orders by push time when asked, so the walk stops at the first
+// repository older than the window rather than paging through an account's
+// entire history. For a normal work session that is one page and usually a
+// handful of repositories.
+//
+// `since` must be the START of the window, not its end: a commit written during
+// a session and pushed hours later leaves pushed_at far in the future relative
+// to the window, and it is exactly that commit the periodic re-scan exists to
+// catch.
+func (c *Client) ReposPushedSince(ctx context.Context, since time.Time, limit int) ([]Repo, error) {
+	path := "/user/repos?sort=pushed&direction=desc&per_page=100&affiliation=owner,collaborator,organization_member"
+	var out []Repo
+	for path != "" && len(out) < limit {
+		var page []Repo
+		next, err := c.getPage(ctx, path, &page)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range page {
+			if !r.PushedAt.IsZero() && r.PushedAt.Before(since) {
+				// Ordered by push time: everything after this is older too.
+				return out, nil
+			}
+			out = append(out, r)
+			if len(out) >= limit {
+				return out, nil
+			}
+		}
+		if len(page) == 0 {
+			return out, nil
+		}
+		path = next
+	}
+	return out, nil
+}
