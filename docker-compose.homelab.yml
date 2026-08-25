@@ -1,0 +1,62 @@
+# Homelab deploy (ct104). The central Caddy on CT103 terminates TLS and proxies
+# to this app on host port 8091; there is no bundled Caddy here. Postgres is
+# app-local — the shared instance was retired in 2026-07.
+#
+# For a normal self-host, use deploy/docker-compose.yml instead: it brings its
+# own Caddy and gets a certificate on its own.
+name: punchcard
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: punchcard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: punchcard
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U punchcard -d punchcard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${APP_VERSION:-dev}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      APP_SECRET: ${APP_SECRET:?set in .env}
+      DATABASE_URL: postgres://punchcard:${POSTGRES_PASSWORD}@db:5432/punchcard?sslmode=disable
+      HTTP_ADDR: ":8080"
+      PUBLIC_BASE_URL: https://punchcard.cobanov.run
+      LOG_LEVEL: info
+      AUTO_MIGRATE: "true"
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      # Social login. GitHub is the one that matters here: the same
+      # authorization that signs a user in also grants the commit scanner
+      # access, when the sign-in link asks for the repo scope.
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # Seals stored GitHub tokens. Empty means commit matching is off; the
+      # service will not fall back to storing tokens in the clear.
+      GITHUB_TOKEN_KEY: ${GITHUB_TOKEN_KEY:-}
+      WEBHOOK_ENCRYPTION_KEY: ${WEBHOOK_ENCRYPTION_KEY:-}
+      SCAN_INTERVAL: ${SCAN_INTERVAL:-1m}
+      SCAN_REQUEUE_INTERVAL: ${SCAN_REQUEUE_INTERVAL:-1h}
+    ports:
+      - "8091:8080"
+
+volumes:
+  pgdata:

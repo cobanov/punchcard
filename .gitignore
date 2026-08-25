@@ -1,6 +1,6 @@
-# Binaries (anchored to repo root so cmd/helva/ source is NOT ignored)
+# Binaries (anchored to repo root so cmd/punchcard/ source is NOT ignored)
 /bin/
-/helva
+/punchcard
 
 # Local environment (never commit real secrets; only .env.example is tracked)
 .env
@@ -16,22 +16,8 @@ coverage.*
 .idea/
 .vscode/
 
-# Web UI build artifacts (embedded from Phase 6)
-/web/node_modules/
-/web/dist/
-/web/extension/dist/
-
 # Session scratch (deploy script, verification screenshots/scripts)
 /scratchpad/
 
-# Browser-automation scratch. The Playwright MCP server drops a console log and
-# one page snapshot per interaction here while a task is being verified by hand.
-# Useful while the session is alive, worthless afterwards, and large enough that
-# a stray `git add` would bury a real diff in it.
+# Browser-automation scratch.
 /.playwright-mcp/
-
-# Agent skills fetched by `npx skills add` and the symlinks it points at them.
-# skills-lock.json IS tracked — it pins what to fetch, so a clone reproduces the
-# same set with: npx skills add jakubkrehel/skills --skill '*'
-.agents/
-.claude/skills/
