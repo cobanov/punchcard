@@ -1,0 +1,18 @@
+# Caddy terminates TLS and proxies to the plain-HTTP app (Section 3/14).
+# Set DOMAIN in deploy/.env to a real hostname for automatic HTTPS via Let's
+# Encrypt; leave it as ":80" for local HTTP-only testing.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Baseline security headers. HSTS is a no-op over plain HTTP and takes
+	# effect once served over HTTPS. A strict CSP is added in Phase 6 when the
+	# web UI ships, so it can be scoped to the app's own assets.
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	reverse_proxy app:8080
+}

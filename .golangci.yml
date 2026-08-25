@@ -1,0 +1,51 @@
+# golangci-lint v2 configuration.
+# gosec is run as its own CI step (see .github/workflows/ci.yml) and is
+# therefore intentionally not enabled here to avoid duplicate reporting.
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - depguard
+    - bodyclose
+    - misspell
+    - unconvert
+  settings:
+    depguard:
+      rules:
+        # Section 7 invariant: raw database access lives ONLY in internal/repo.
+        # This rule forbids importing pgx or database/sql anywhere else, so
+        # tenant-isolation checks cannot be bypassed by reaching for SQL in a
+        # handler or service. internal/testutil is exempt (test plumbing).
+        sql-confined-to-repo:
+          list-mode: lax
+          files:
+            - "!**/internal/repo/**"
+            - "!**/internal/testutil/**"
+          deny:
+            - pkg: "github.com/jackc/pgx"
+              desc: "DB access is confined to internal/repo (Section 7); call a repository method instead"
+            - pkg: "database/sql"
+              desc: "DB access is confined to internal/repo (Section 7); call a repository method instead"
+  exclusions:
+    generated: lax
+    rules:
+      # sqlc-generated code lives here and is not hand-maintained.
+      - path: internal/repo/db/
+        linters:
+          - unused
+          - unparam
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/cobanov/punchcard
+  exclusions:
+    generated: lax
