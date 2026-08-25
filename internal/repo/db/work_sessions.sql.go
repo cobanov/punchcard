@@ -385,7 +385,7 @@ func (q *Queries) StartWorkSession(ctx context.Context, arg StartWorkSessionPara
 
 const stopOpenSessionForUser = `-- name: StopOpenSessionForUser :many
 UPDATE work_sessions
-SET ended_at = GREATEST($1::timestamptz, started_at + interval '1 second'),
+SET ended_at = GREATEST($1::timestamptz, started_at + interval '1 microsecond'),
     updated_at = now(),
     sync_state = 'pending',
     sync_next_at = now(),
@@ -404,6 +404,14 @@ type StopOpenSessionForUserParams struct {
 // transaction as StartWorkSession so a "start" that replaces a running timer is
 // atomic: there is never an instant with two open sessions, which is what the
 // one_open_session_per_user index would reject anyway.
+//
+// The GREATEST is the range CHECK's guard: ended_at must be strictly after
+// started_at, so a stop that lands on (or before) the start is nudged one
+// microsecond forward rather than failing. A microsecond, not a second — with a
+// second, replacing a timer less than a second old would push its end PAST the
+// new session's start and the two would overlap, which is exactly what commit
+// attribution cannot survive. The caller reads the returned ended_at back and
+// starts the next session there, so the two abut exactly.
 func (q *Queries) StopOpenSessionForUser(ctx context.Context, arg StopOpenSessionForUserParams) ([]WorkSession, error) {
 	rows, err := q.db.Query(ctx, stopOpenSessionForUser, arg.At, arg.UserID)
 	if err != nil {
@@ -441,7 +449,7 @@ func (q *Queries) StopOpenSessionForUser(ctx context.Context, arg StopOpenSessio
 
 const stopWorkSession = `-- name: StopWorkSession :one
 UPDATE work_sessions
-SET ended_at = GREATEST($1::timestamptz, started_at + interval '1 second'),
+SET ended_at = GREATEST($1::timestamptz, started_at + interval '1 microsecond'),
     updated_at = now(),
     sync_state = 'pending',
     sync_next_at = now(),

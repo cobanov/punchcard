@@ -114,6 +114,8 @@ func BuildRouter(d Deps) (*chi.Mux, huma.API) {
 	d.registerAuthRoutes(api)
 	d.registerMeRoutes(api)
 	d.registerProjectRoutes(api)
+	d.registerSessionRoutes(api)
+	d.registerReportRoutes(api)
 	d.registerAccountRoutes(api)
 	d.registerWebhookRoutes(api)
 

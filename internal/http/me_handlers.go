@@ -171,7 +171,7 @@ func (d Deps) registerMeRoutes(api huma.API) {
 		Summary: "List active sessions", Tags: []string{"me"}, Errors: []int{401, 403},
 	}, func(ctx context.Context, _ *struct{}) (*struct {
 		Body struct {
-			Sessions []SessionDTO `json:"sessions"`
+			Sessions []AuthSessionDTO `json:"sessions"`
 		}
 	}, error) {
 		p, err := requirePrincipal(ctx)
@@ -184,12 +184,12 @@ func (d Deps) registerMeRoutes(api huma.API) {
 		}
 		out := &struct {
 			Body struct {
-				Sessions []SessionDTO `json:"sessions"`
+				Sessions []AuthSessionDTO `json:"sessions"`
 			}
 		}{}
-		out.Body.Sessions = make([]SessionDTO, 0, len(sessions))
+		out.Body.Sessions = make([]AuthSessionDTO, 0, len(sessions))
 		for _, s := range sessions {
-			out.Body.Sessions = append(out.Body.Sessions, sessionDTO(s, p.SessionID))
+			out.Body.Sessions = append(out.Body.Sessions, authSessionDTO(s, p.SessionID))
 		}
 		return out, nil
 	})

@@ -82,3 +82,6 @@ WHERE user_id = sqlc.arg(user_id)
   AND committed_at >= sqlc.arg(from_ts)::timestamptz
   AND committed_at <= sqlc.arg(to_ts)::timestamptz
 ORDER BY committed_at ASC;
+
+-- name: DetachCommit :execrows
+DELETE FROM session_commits WHERE session_id = $1 AND commit_id = $2;

@@ -107,6 +107,23 @@ func (q *Queries) DeleteGitHubEmail(ctx context.Context, arg DeleteGitHubEmailPa
 	return result.RowsAffected(), nil
 }
 
+const detachCommit = `-- name: DetachCommit :execrows
+DELETE FROM session_commits WHERE session_id = $1 AND commit_id = $2
+`
+
+type DetachCommitParams struct {
+	SessionID uuid.UUID `json:"session_id"`
+	CommitID  uuid.UUID `json:"commit_id"`
+}
+
+func (q *Queries) DetachCommit(ctx context.Context, arg DetachCommitParams) (int64, error) {
+	result, err := q.db.Exec(ctx, detachCommit, arg.SessionID, arg.CommitID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const detachCommitsFromSession = `-- name: DetachCommitsFromSession :execrows
 DELETE FROM session_commits WHERE session_id = $1
 `

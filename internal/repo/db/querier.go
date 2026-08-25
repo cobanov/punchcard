@@ -46,6 +46,7 @@ type Querier interface {
 	DeleteStaleAuthSessions(ctx context.Context) (int64, error)
 	DeleteUserEmailTokens(ctx context.Context, arg DeleteUserEmailTokensParams) error
 	DeleteWebhook(ctx context.Context, arg DeleteWebhookParams) (int64, error)
+	DetachCommit(ctx context.Context, arg DetachCommitParams) (int64, error)
 	DetachCommitsFromSession(ctx context.Context, sessionID uuid.UUID) (int64, error)
 	DisableWebhook(ctx context.Context, arg DisableWebhookParams) error
 	GetAPITokenByHash(ctx context.Context, tokenHash []byte) (GetAPITokenByHashRow, error)
@@ -134,6 +135,14 @@ type Querier interface {
 	// transaction as StartWorkSession so a "start" that replaces a running timer is
 	// atomic: there is never an instant with two open sessions, which is what the
 	// one_open_session_per_user index would reject anyway.
+	//
+	// The GREATEST is the range CHECK's guard: ended_at must be strictly after
+	// started_at, so a stop that lands on (or before) the start is nudged one
+	// microsecond forward rather than failing. A microsecond, not a second — with a
+	// second, replacing a timer less than a second old would push its end PAST the
+	// new session's start and the two would overlap, which is exactly what commit
+	// attribution cannot survive. The caller reads the returned ended_at back and
+	// starts the next session there, so the two abut exactly.
 	StopOpenSessionForUser(ctx context.Context, arg StopOpenSessionForUserParams) ([]WorkSession, error)
 	StopWorkSession(ctx context.Context, arg StopWorkSessionParams) (WorkSession, error)
 	// Day buckets are cut in the caller's timezone, not UTC: a session that runs

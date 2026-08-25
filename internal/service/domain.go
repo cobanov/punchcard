@@ -86,3 +86,7 @@ func quotaLimit(n int) int32 {
 		return int32(n)
 	}
 }
+
+// isNoRows reports whether err is "no rows", the shape a sqlc :one query
+// returns when nothing matched.
+func isNoRows(err error) bool { return repo.IsNotFound(err) }

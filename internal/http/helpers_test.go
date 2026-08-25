@@ -91,3 +91,11 @@ func must(t *testing.T, name string, got, want int) {
 		t.Fatalf("%s: got %d, want %d", name, got, want)
 	}
 }
+
+// st performs a request and returns only its status code, for assertions where
+// the body does not matter.
+func st(t *testing.T, c *http.Client, method, url string, body any, hdr map[string]string) int {
+	t.Helper()
+	code, _ := do(t, c, method, url, body, hdr)
+	return code
+}

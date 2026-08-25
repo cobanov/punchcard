@@ -67,8 +67,9 @@ func tokenDTO(t db.ApiToken) TokenDTO {
 	return dto
 }
 
-// SessionDTO is a listed session.
-type SessionDTO struct {
+// AuthSessionDTO is a listed browser login session — not a work session.
+// See CLAUDE.md: the two must never share a name.
+type AuthSessionDTO struct {
 	ID         string    `json:"id"`
 	CreatedAt  time.Time `json:"created_at"`
 	LastSeenAt time.Time `json:"last_seen_at"`
@@ -78,8 +79,8 @@ type SessionDTO struct {
 	Current    bool      `json:"current"`
 }
 
-func sessionDTO(s db.AuthSession, current *uuid.UUID) SessionDTO {
-	return SessionDTO{
+func authSessionDTO(s db.AuthSession, current *uuid.UUID) AuthSessionDTO {
+	return AuthSessionDTO{
 		ID:         s.ID.String(),
 		CreatedAt:  s.CreatedAt,
 		LastSeenAt: s.LastSeenAt,
