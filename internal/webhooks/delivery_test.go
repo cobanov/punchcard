@@ -53,16 +53,9 @@ func TestDeliveryLifecycle(t *testing.T) {
 	}))
 	defer recv.Close()
 
-	// Seed a user, list, membership, webhook, and an event.
+	// Seed a user, a webhook, and an event.
 	uid := mustV7(t)
 	if _, err := store.CreateUser(ctx, db.CreateUserParams{ID: uid, Email: "wh@example.com", PasswordHash: "x"}); err != nil {
-		t.Fatal(err)
-	}
-	lid := mustV7(t)
-	if _, err := store.CreateList(ctx, db.CreateListParams{ID: lid, Name: "L", OwnerID: uid}); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.AddMember(ctx, db.AddMemberParams{ListID: lid, UserID: uid, Role: "owner"}); err != nil {
 		t.Fatal(err)
 	}
 	key, _ := GenerateKey()
@@ -71,13 +64,13 @@ func TestDeliveryLifecycle(t *testing.T) {
 	enc, _ := cipher.Encrypt([]byte(secret))
 	wid := mustV7(t)
 	if _, err := store.CreateWebhook(ctx, db.CreateWebhookParams{
-		ID: wid, ListID: lid, Url: recv.URL, SecretEncrypted: enc, Events: []byte("[]"), CreatedBy: &uid,
+		ID: wid, UserID: uid, Url: recv.URL, SecretEncrypted: enc, Events: []byte("[]"),
 	}); err != nil {
 		t.Fatal(err)
 	}
-	payload := []byte(`{"type":"task.created","resource":{"id":"x"}}`)
+	payload := []byte(`{"type":"session.started","resource":{"id":"x"}}`)
 	eid := mustV7(t)
-	if _, err := store.InsertEvent(ctx, db.InsertEventParams{ID: eid, Type: "task.created", ListID: &lid, Payload: payload}); err != nil {
+	if _, err := store.InsertEvent(ctx, db.InsertEventParams{ID: eid, Type: "session.started", UserID: uid, Payload: payload}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -104,7 +97,7 @@ func TestDeliveryLifecycle(t *testing.T) {
 	// Failing delivery schedules a retry.
 	failNext = true
 	eid2 := mustV7(t)
-	if _, err := store.InsertEvent(ctx, db.InsertEventParams{ID: eid2, Type: "task.created", ListID: &lid, Payload: payload}); err != nil {
+	if _, err := store.InsertEvent(ctx, db.InsertEventParams{ID: eid2, Type: "session.started", UserID: uid, Payload: payload}); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.RunOnce(ctx); err != nil {

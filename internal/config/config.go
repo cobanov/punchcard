@@ -112,22 +112,6 @@ type Config struct {
 	AppleKeyID      string `env:"APPLE_KEY_ID"`
 	ApplePrivateKey string `env:"APPLE_PRIVATE_KEY"`
 
-	// --- Assistant ---
-	// GeminiAPIKey enables POST /v1/chat, which turns a sentence into calls
-	// against the same task/list operations the API and MCP already expose. If
-	// empty the route still registers and answers 503 with a reason, rather
-	// than vanishing — an endpoint that is missing on one deployment and
-	// present on another is harder to debug than one that explains itself.
-	//
-	// Server-wide, deliberately: punchcard self-hosts, so the operator's key is the
-	// operator's cost. Per-account keys would need encrypting at rest, which
-	// the webhook secret already does — that is the path if this ever needs to
-	// be per user.
-	GeminiAPIKey string `env:"GEMINI_API_KEY"`
-	// GeminiModel overrides the default. See gemini.DefaultModel for why that
-	// default is what it is.
-	GeminiModel string `env:"GEMINI_MODEL"`
-
 	// --- Rate limiting ---
 	RateLimitPerMin     int `env:"RATE_LIMIT_PER_MIN" envDefault:"120"`
 	RateLimitBurst      int `env:"RATE_LIMIT_BURST" envDefault:"40"`
@@ -153,21 +137,18 @@ type Config struct {
 	SSEMaxConnPerUser int           `env:"SSE_MAX_CONN_PER_USER" envDefault:"10"`
 	SSEPollInterval   time.Duration `env:"SSE_POLL_INTERVAL" envDefault:"1s"`
 
-	// --- Offline sync (docs/offline-sync.md) ---
 	// EventGraceWindow is how fresh an event may be before the seq-cursor reads
-	// (GET /v1/changes, SSE) will serve it. It guards against bigserial values
-	// committing out of order; see db/queries/events.sql.
+	// (SSE) will serve it. It guards against bigserial values committing out of
+	// order; see db/queries/events.sql.
 	EventGraceWindow time.Duration `env:"EVENT_GRACE_WINDOW" envDefault:"1s"`
-	// JanitorInterval is how often retention jobs run (soft-deleted task purge,
-	// old event purge, expired idempotency keys). 0 disables the janitor.
+	// JanitorInterval is how often retention jobs run (old event purge, expired
+	// idempotency keys, GitHub re-scans). 0 disables the janitor.
 	JanitorInterval time.Duration `env:"JANITOR_INTERVAL" envDefault:"1h"`
 
 	// --- Quotas (generous defaults) ---
 	MaxPATsPerUser     int `env:"MAX_PATS_PER_USER" envDefault:"25"`
 	MaxProjectsPerUser int `env:"MAX_PROJECTS_PER_USER" envDefault:"500"`
-	MaxMembersPerList  int `env:"MAX_MEMBERS_PER_LIST" envDefault:"50"`
 	MaxWebhooksPerUser int `env:"MAX_WEBHOOKS_PER_USER" envDefault:"10"`
-	MaxInvitesPerUser  int `env:"MAX_PENDING_INVITES_PER_USER" envDefault:"100"`
 }
 
 // GoogleOAuthEnabled reports whether Google sign-in is configured.

@@ -126,7 +126,7 @@ func TestUserIssuedPATStillCannotReachTheAccountPlane(t *testing.T) {
 
 	// And the token is still a working token for the data plane, so the refusals
 	// above are about the plane rather than a broken credential.
-	if st, _ := do(t, c, http.MethodGet, base+"/v1/lists", nil, bearer); st != http.StatusOK {
-		t.Fatalf("PAT /v1/lists = %d, want 200", st)
+	if st, _ := do(t, c, http.MethodGet, base+"/v1/webhooks", nil, bearer); st != http.StatusOK {
+		t.Fatalf("PAT /v1/webhooks = %d, want 200", st)
 	}
 }

@@ -19,7 +19,7 @@ package repo
 import "context"
 
 // Sweep runs one retention pass synchronously. Its only caller is
-// TestSweepPurgesOldActivity (janitor_test.go), which needs the real sweep —
+// TestSweepPurgesOldEvents (janitor_test.go), which needs the real sweep —
 // not a direct call to one job's own query — to prove that job actually got
 // added to sweep's list rather than merely working in isolation.
 func (j *Janitor) Sweep(ctx context.Context) {

@@ -33,7 +33,10 @@ func TestHealthReadinessAndSpec(t *testing.T) {
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
 
-	assertStatus(t, srv.URL+"/", http.StatusOK)
+	// v1 serves no SPA, so "/" is a 404 rather than an index page. The
+	// human-readable surface is the OpenAPI explorer.
+	assertStatus(t, srv.URL+"/", http.StatusNotFound)
+	assertStatus(t, srv.URL+"/docs", http.StatusOK)
 	assertStatus(t, srv.URL+"/healthz", http.StatusOK)
 	assertStatus(t, srv.URL+"/readyz", http.StatusOK)
 	assertStatus(t, srv.URL+"/metrics", http.StatusOK)

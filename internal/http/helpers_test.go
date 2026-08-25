@@ -3,6 +3,7 @@ package http
 import (
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"testing"
 	"time"
 
@@ -34,15 +35,11 @@ func testConfig() *config.Config {
 		AuthRateLimitPerMin: 60,
 		AuthRateLimitBurst:  30,
 		MaxPATsPerUser:      25,
-		MaxListsPerUser:     200,
-		MaxTasksPerList:     10000,
-		MaxMembersPerList:   50,
-		MaxWebhooksPerList:  10,
-		MaxInvitesPerUser:   100,
+		MaxProjectsPerUser:  500,
+		MaxWebhooksPerUser:  10,
 		SSEMaxConnPerUser:   10,
 		SSEPollInterval:     150 * time.Millisecond,
-		// Zero grace window: router tests assert immediate delivery. The
-		// window's own behavior is covered in internal/service/changes_test.go.
+		// Zero grace window: router tests assert immediate delivery.
 		EventGraceWindow: 0,
 	}
 }
@@ -68,4 +65,35 @@ func assertStatus(t *testing.T, url string, want int) {
 	if resp.StatusCode != want {
 		t.Fatalf("GET %s: status = %d, want %d", url, resp.StatusCode, want)
 	}
+}
+
+// registerActor creates an account with its own cookie jar and returns a client
+// already signed in as that user, plus the user's id.
+func registerActor(t *testing.T, base, email string) (*http.Client, string) {
+	t.Helper()
+	jar, _ := cookiejar.New(nil)
+	c := &http.Client{Jar: jar}
+	if code, _ := do(t, c, http.MethodPost, base+"/v1/auth/register",
+		map[string]string{"email": email, "password": "supersecret123"}, nil); code != http.StatusCreated {
+		t.Fatalf("register %s: %d", email, code)
+	}
+	_, body := do(t, c, http.MethodGet, base+"/v1/me", nil, nil)
+	var me struct {
+		ID string `json:"id"`
+	}
+	unmarshal(t, body, &me)
+	return c, me.ID
+}
+
+func must(t *testing.T, name string, got, want int) {
+	t.Helper()
+	if got != want {
+		t.Fatalf("%s: got %d, want %d", name, got, want)
+	}
+}
+
+func st(t *testing.T, c *http.Client, method, url string, body any, hdr map[string]string) int {
+	t.Helper()
+	code, _ := do(t, c, method, url, body, hdr)
+	return code
 }

@@ -57,13 +57,14 @@ func TestLoginOAuth_CreateThenMatch(t *testing.T) {
 	if user.EmailVerifiedAt == nil {
 		t.Error("provider-verified email should be marked verified")
 	}
-	// A default Inbox list should have been created.
-	lists, err := a.store.ListListsForUser(ctx, db.ListListsForUserParams{UserID: user.ID, Lim: 200})
+	// A default project should have been created: without one the account
+	// cannot start a timer at all.
+	projects, err := a.store.ListProjects(ctx, db.ListProjectsParams{OwnerID: user.ID, IncludeArchived: true})
 	if err != nil {
-		t.Fatalf("list lists: %v", err)
+		t.Fatalf("list projects: %v", err)
 	}
-	if len(lists) != 1 {
-		t.Fatalf("expected 1 default list, got %d", len(lists))
+	if len(projects) != 1 || projects[0].Name != "General" {
+		t.Fatalf("expected one default project named General, got %+v", projects)
 	}
 
 	// Second login with the same identity must reuse the account, not duplicate.

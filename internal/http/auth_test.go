@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -80,11 +81,15 @@ func newAuthTestServer(t *testing.T) (*httptest.Server, *captureSender) {
 	authSvc := service.NewAuth(store, sender, auditor, logger, cfg)
 	whKey, _ := webhooks.GenerateKey()
 	cipher, _ := webhooks.NewCipher(whKey)
-	domainSvc := service.NewDomain(store, auditor, sender, cipher, logger, cfg)
-
-	migrator, err := repo.NewMigrator(pool)
+	ghCipher, err := service.NewGitHubCipher(base64.StdEncoding.EncodeToString(make([]byte, 32)))
 	if err != nil {
-		t.Fatalf("migrator: %v", err)
+		t.Fatalf("github cipher: %v", err)
+	}
+	domainSvc := service.NewDomain(store, auditor, sender, cipher, ghCipher, logger, cfg)
+
+	migrator, merr := repo.NewMigrator(pool)
+	if merr != nil {
+		t.Fatalf("migrator: %v", merr)
 	}
 	t.Cleanup(func() { _ = migrator.Close() })
 
@@ -271,8 +276,8 @@ func TestNativeLoginToken(t *testing.T) {
 	// The token authenticates a fresh client (no cookie jar) via Bearer.
 	fresh := &http.Client{}
 	bearer := map[string]string{"Authorization": "Bearer " + out.Token}
-	if st, _ := do(t, fresh, http.MethodGet, srv.URL+"/v1/lists", nil, bearer); st != http.StatusOK {
-		t.Fatalf("bearer /v1/lists = %d, want 200", st)
+	if st, _ := do(t, fresh, http.MethodGet, srv.URL+"/v1/webhooks", nil, bearer); st != http.StatusOK {
+		t.Fatalf("bearer /v1/webhooks = %d, want 200", st)
 	}
 
 	// Logging out with the device token revokes it server-side (ATD-44): the same
@@ -280,8 +285,8 @@ func TestNativeLoginToken(t *testing.T) {
 	if st, _ := do(t, fresh, http.MethodPost, srv.URL+"/v1/auth/logout", nil, bearer); st != http.StatusOK {
 		t.Fatalf("bearer logout = %d, want 200", st)
 	}
-	if st, _ := do(t, fresh, http.MethodGet, srv.URL+"/v1/lists", nil, bearer); st != http.StatusUnauthorized {
-		t.Fatalf("bearer /v1/lists after logout = %d, want 401", st)
+	if st, _ := do(t, fresh, http.MethodGet, srv.URL+"/v1/webhooks", nil, bearer); st != http.StatusUnauthorized {
+		t.Fatalf("bearer /v1/webhooks after logout = %d, want 401", st)
 	}
 
 	// Wrong password → 401.

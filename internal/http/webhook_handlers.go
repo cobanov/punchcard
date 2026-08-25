@@ -65,10 +65,8 @@ type webhookBody struct {
 func (d Deps) registerWebhookRoutes(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "webhooks-list", Method: http.MethodGet, Path: "/v1/webhooks",
-		Summary: "List webhooks on a list", Tags: []string{"webhooks"}, Errors: []int{401, 403, 404},
-	}, func(ctx context.Context, in *struct {
-		ID string `path:"id" format:"uuid"`
-	}) (*struct {
+		Summary: "List the account's webhooks", Tags: []string{"webhooks"}, Errors: []int{401, 403},
+	}, func(ctx context.Context, _ *struct{}) (*struct {
 		Body struct {
 			Webhooks []WebhookDTO `json:"webhooks"`
 		}
@@ -98,7 +96,6 @@ func (d Deps) registerWebhookRoutes(api huma.API) {
 		Summary: "Create a webhook", Tags: []string{"webhooks"}, DefaultStatus: http.StatusCreated,
 		Errors: []int{401, 403, 404, 409, 422, 503},
 	}, func(ctx context.Context, in *struct {
-		ID   string `path:"id" format:"uuid"`
 		Body struct {
 			URL    string   `json:"url" format:"uri"`
 			Events []string `json:"events,omitempty" doc:"Event types to receive; empty = all."`
