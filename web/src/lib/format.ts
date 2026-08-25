@@ -87,3 +87,30 @@ export function toDateInput(d: Date): string {
 }
 
 export const firstLine = (s: string) => s.split("\n")[0]?.trim() ?? "";
+
+/**
+ * The canonical name of a piece of work, from whatever we happen to know.
+ *
+ * The same project arrives under two spellings depending on where the evidence
+ * came from: a run whose directory had a git remote reports "cobanov/herdrchat",
+ * one without reports the directory "/Users/cobanov/Developer/herdrchat". Those
+ * are the same thing, and showing them as two — two lanes, two colours, two
+ * summary lines — is the interface inventing a distinction the user does not
+ * have.
+ *
+ * The last path segment is what they agree on. Dropping the owner loses nothing
+ * here either: it is the same for every repository a person owns, so it is a
+ * prefix that never distinguishes anything. Two different owners' repositories
+ * with the same name would collide, which is a real limit and a rare one.
+ */
+export function workKey(repo?: string, cwd?: string): string {
+  const source = repo || cwd || "";
+  const last = source.split("/").filter(Boolean).pop() ?? "";
+  return last.toLowerCase();
+}
+
+/** The same, kept in the casing it was written in, for showing to people. */
+export function workLabel(repo?: string, cwd?: string, fallback = ""): string {
+  const source = repo || cwd || "";
+  return source.split("/").filter(Boolean).pop() || fallback;
+}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type AgentRun, type Project, type Session } from "../lib/api";
 import { assignColors } from "../lib/palette";
-import { hhmm, total } from "../lib/format";
+import { hhmm, total, workKey, workLabel } from "../lib/format";
 
 /**
  * The day as a shape, in two bands.
@@ -123,10 +123,11 @@ function mergeRuns(runs: AgentRun[]): RunStretch[] {
     const end = to < from ? MINUTES : to;
     if (end < from) continue;
 
-    // A run with no remote is still somewhere: the directory is the weaker
-    // answer but it still separates one piece of work from another.
-    const key = r.repo || r.cwd || r.tool;
-    const label = r.repo || (r.cwd ? r.cwd.split("/").filter(Boolean).pop() ?? r.tool : r.tool);
+    // The same project arrives spelled two ways — "cobanov/herdrchat" from a
+    // directory with a git remote, "herdrchat" from one without — and giving
+    // them separate lanes and colours would invent a distinction nobody has.
+    const key = workKey(r.repo, r.cwd) || r.tool;
+    const label = workLabel(r.repo, r.cwd, r.tool);
 
     const stream = streams.get(key) ?? [];
     const last = stream[stream.length - 1];

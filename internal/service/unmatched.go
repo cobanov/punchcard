@@ -168,17 +168,32 @@ func (d *Domain) describeCluster(ctx context.Context, p *auth.Principal, cl *Evi
 			notes = append(notes, subject)
 		}
 	}
-	seenDir := map[string]bool{}
+	// Repository names reduced to their last segment, so a directory that is
+	// simply that repository's own folder is recognised as the same place. The
+	// same project arrives spelled both ways depending on whether the directory
+	// a run happened in had a git remote, and reporting it as two would invent a
+	// distinction the user does not have.
+	seenBase := map[string]bool{}
+	for _, name := range cl.Repos {
+		seenBase[strings.ToLower(path.Base(name))] = true
+	}
 	for _, r := range cl.Runs {
 		addRepo(r.RepoFullName)
+		if r.RepoFullName != "" {
+			seenBase[strings.ToLower(path.Base(r.RepoFullName))] = true
+			continue
+		}
 		// Only when there is no repository: a directory is the weaker answer and
 		// should not compete with one the git remote already gave.
-		if r.RepoFullName == "" && r.Cwd != "" {
-			if base := path.Base(filepath.ToSlash(r.Cwd)); base != "" && base != "." && base != "/" && !seenDir[base] {
-				seenDir[base] = true
-				cl.Dirs = append(cl.Dirs, base)
-			}
+		if r.Cwd == "" {
+			continue
 		}
+		base := path.Base(filepath.ToSlash(r.Cwd))
+		if base == "" || base == "." || base == "/" || seenBase[strings.ToLower(base)] {
+			continue
+		}
+		seenBase[strings.ToLower(base)] = true
+		cl.Dirs = append(cl.Dirs, base)
 	}
 	// The note comes from commit subjects and nothing else. Prompts are not
 	// captured — deliberately — so a run has no text to contribute, and

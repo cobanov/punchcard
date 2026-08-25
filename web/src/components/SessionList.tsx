@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type AgentRun, type Cluster, type Commit, type Project, type Session } from "../lib/api";
-import { firstLine, hhmm, total } from "../lib/format";
+import { firstLine, hhmm, total, workKey, workLabel } from "../lib/format";
 
 /**
  * The day, as rows.
@@ -325,6 +325,12 @@ function UnmatchedRow({
   // directory is the next honest guess — it is what the person called the
   // folder they were working in.
   const suggestedName = repo ? repoBase(repo) : (cluster.dirs?.[0] ?? "");
+  // Repos and dirs are separate fields on the wire, but a directory that is
+  // simply the repo's own folder is not a second place — show one.
+  const places = [
+    ...(cluster.repos ?? []).map((r) => repoBase(r)),
+    ...(cluster.dirs ?? []),
+  ].filter((v, i, all) => all.indexOf(v) === i);
   const runs = cluster.agent_runs ?? [];
   const agentSeconds = runs.reduce((sum, r) => sum + r.seconds, 0);
   // Wall time, which is what recording this actually produces. Agents run in
@@ -350,10 +356,6 @@ function UnmatchedRow({
       (suggestedName ? CREATE : projects[0]?.id ?? ""),
   );
   const n = cluster.commits.length;
-  const repos =
-    cluster.repos.length <= 2
-      ? cluster.repos.join(", ")
-      : `${cluster.repos.slice(0, 2).join(", ")} +${cluster.repos.length - 2}`;
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-dashed border-line px-3 py-2">
@@ -384,7 +386,9 @@ function UnmatchedRow({
           </span>
         )}{" "}
         · no timer was running ·{" "}
-        <span className="font-mono t-caption">{repos || cluster.dirs?.join(", ") || "—"}</span>
+        <span className="font-mono t-caption">
+          {places.length <= 2 ? places.join(", ") : `${places.slice(0, 2).join(", ")} +${places.length - 2}`}
+        </span>
       </span>
       <select
         value={choice}
@@ -454,8 +458,8 @@ function AgentRunList({ sessionID }: { sessionID: string }) {
     { label: string; tool: string; seconds: number; turns: number; model: string; from: string; to: string }
   >();
   for (const r of runs) {
-    const where = r.repo || (r.cwd ? r.cwd.split("/").filter(Boolean).pop() ?? "" : "");
-    const key = `${r.tool}|${where}`;
+    const where = workLabel(r.repo, r.cwd);
+    const key = `${r.tool}|${workKey(r.repo, r.cwd)}`;
     const g = groups.get(key);
     if (!g) {
       groups.set(key, {
