@@ -12,7 +12,7 @@
 # with the Go gate at the repo root, and `make check` there must not depend on
 # a machine having Xcode.
 
-VERSION     := 0.1.0
+VERSION     := 0.2.0
 APP         := PunchcardBar
 BUNDLE_ID   := run.cobanov.punchcard.bar
 MIN_MACOS   := 14.0

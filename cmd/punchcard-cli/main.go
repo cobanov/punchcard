@@ -176,7 +176,8 @@ Commands:
   status                     What is running, and for how long
   today                      Today's records with their commits
   week                       The last seven days
-  sync                       Send recorded agent turns to the server
+  sync                       Send recorded agent turns now (they also go on
+                             their own; PUNCHCARD_NO_AUTOSYNC=1 stops that)
   backfill [--days=N]        Reconstruct past turns from local transcripts
   hook install               Record Claude Code turns as evidence
   projects                   List projects

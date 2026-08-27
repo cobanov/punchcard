@@ -77,6 +77,12 @@ struct BarState: Sendable {
     var todayCommits: Int = 0
     var github: GitHubStatus?
     var lastError: String?
+    /// Agent turns recorded on this Mac that have not reached the server.
+    ///
+    /// Kept in the state rather than read while drawing: the menu redraws once a
+    /// second while it is open, and hitting the filesystem on every one of those
+    /// to answer a question that changes every few minutes would be silly.
+    var pendingRuns: Int = 0
 
     func projectName(_ id: String) -> String {
         projects.first { $0.id == id }?.name ?? "—"

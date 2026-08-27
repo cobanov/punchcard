@@ -20,6 +20,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// A timer running this long is almost certainly forgotten.
     private static let runawayAfter: TimeInterval = 8 * 3600
 
+    /// How often the local agent-turn queue is drained.
+    ///
+    /// Not every poll: turns arrive every few minutes and each is one line, so
+    /// twenty seconds would be twenty requests to send nothing. Two minutes
+    /// matches what the CLI does from the hook, which keeps the two clients from
+    /// disagreeing about how live "live" is.
+    private static let flushEvery: TimeInterval = 120
+
     private var statusItem: NSStatusItem!
     private var state = BarState()
     private var pollTimer: Timer?
@@ -31,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var openMenu: NSMenu?
     private var warnedAboutRunaway: Set<String> = []
     private var baseURL = API.defaultBaseURL
+    private var lastFlush: Date?
+    private var flushing = false
 
     // MARK: - Lifecycle
 
@@ -95,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             state.todayCommits = commits
             state.lastError = nil
+            await flushQueue(using: api, force: false)
         } catch let problem as APIProblem {
             if problem.status == 401 {
                 // The token is gone. Say so plainly and stop pretending to be
@@ -109,6 +120,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         redrawTitle()
         checkRunaway()
+    }
+
+    /// Sends whatever the hook has recorded since the last flush.
+    ///
+    /// The count is refreshed even when nothing is sent, because the menu's job
+    /// here is not to be busy but to be honest: a backlog that cannot go —
+    /// server down, token expired — has to be visible, and the row is the only
+    /// place on this Mac it ever would be.
+    private func flushQueue(using api: API, force: Bool) async {
+        guard !flushing else { return }
+        if !force, let last = lastFlush, Date().timeIntervalSince(last) < Self.flushEvery {
+            state.pendingRuns = Queue.pendingCount()
+            return
+        }
+        flushing = true
+        defer { flushing = false }
+        lastFlush = Date()
+        // A failure is deliberately not written to `lastError`: the queue keeps
+        // its lines, the next attempt is two minutes away, and displacing the
+        // timer's own errors with a background one would be a worse menu.
+        _ = try? await Queue.flush(using: api)
+        state.pendingRuns = Queue.pendingCount()
     }
 
     // MARK: - Title
@@ -231,6 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 addDisabled(Format.fit("GitHub: \(why)", 48), to: menu)
             }
         }
+        addQueueRow(to: menu)
 
         menu.addItem(.separator())
         let open = NSMenuItem(title: "Open punchcard…", action: #selector(openSite), keyEquivalent: "")
@@ -254,6 +288,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let row = "   \(span)  \(Format.fit(state.projectName(session.projectID), 12))  \(Format.fit(session.note.isEmpty ? "—" : session.note, 24))"
             addDisabled(row, to: menu)
         }
+    }
+
+    /// The queue's state, and a way to act on it.
+    ///
+    /// It draws even when there is nothing waiting. "Up to date" is the answer
+    /// to a question people actually ask of a tool that records them in the
+    /// background, and a row that only appears when something is wrong teaches
+    /// nobody that the mechanism exists.
+    private func addQueueRow(to menu: NSMenu) {
+        guard state.pendingRuns > 0 else {
+            addDisabled("Agent turns — up to date", to: menu)
+            return
+        }
+        let word = state.pendingRuns == 1 ? "turn" : "turns"
+        let item = NSMenuItem(title: "Send \(state.pendingRuns) agent \(word) now",
+                              action: #selector(syncNow), keyEquivalent: "")
+        item.target = self
+        menu.addItem(item)
     }
 
     private func addDisabled(_ title: String, to menu: NSMenu) {
@@ -334,6 +386,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             } catch {
                 state.lastError = (error as? APIProblem)?.detail ?? error.localizedDescription
             }
+        }
+    }
+
+    /// Drains the queue right now, ignoring the throttle.
+    ///
+    /// The automatic flush covers forgetting; this covers impatience — you just
+    /// finished a turn and want it on today's timeline before you look at it.
+    @objc private func syncNow() {
+        guard let api else { return }
+        Task {
+            await flushQueue(using: api, force: true)
+            await refresh()
         }
     }
 

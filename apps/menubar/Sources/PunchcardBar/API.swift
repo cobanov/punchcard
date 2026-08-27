@@ -92,6 +92,21 @@ struct API: Sendable {
         try await post("/v1/sessions/\(sessionID)/stop", body: [:], as: Session.self)
     }
 
+    /// Sends a batch of recorded agent turns.
+    ///
+    /// The body arrives already serialised rather than as a model type, so the
+    /// lines the hook wrote are forwarded exactly as written. Decoding them into
+    /// a struct here would silently drop any field a newer hook had added, and
+    /// this app is not the authority on that file's shape.
+    ///
+    /// The reply separates rows the server had never seen from ones it already
+    /// had; only the first count is returned, because the queue is flushed
+    /// at-least-once and "already known" is a success with nothing to report.
+    func recordAgentRuns(body: Data) async throws -> Int {
+        struct Reply: Codable { let accepted: Int; let duplicates: Int }
+        return try await send(request("/v1/agent-runs", method: "POST", body: body), as: Reply.self).accepted
+    }
+
     // MARK: - Transport
 
     private func get<T: Decodable>(_ path: String, as type: T.Type) async throws -> T {

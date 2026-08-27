@@ -157,7 +157,15 @@ func (a *App) emitTurn(dir, tool string, p hookPayload) error {
 		Repo:       repoOf(p.Cwd),
 	}
 	run.Model, run.ToolCalls = readTranscript(p.TranscriptPath, start)
-	return appendQueue(dir, run)
+	if err := appendQueue(dir, run); err != nil {
+		return err
+	}
+	// The turn is safely on disk before anything reaches for the network. This
+	// call spawns a detached child at most once every autoSyncEvery and returns
+	// immediately, so the promise above — the hook never waits on a server —
+	// still holds, and so does the one about working offline.
+	a.maybeAutoSync(dir)
+	return nil
 }
 
 // repoOf reads the origin remote of the directory a turn ran in.
@@ -278,67 +286,33 @@ func appendQueue(dir string, run QueuedRun) error {
 	return nil
 }
 
-// Sync flushes the queue to the server.
+// Sync flushes the queue to the server and says what happened.
 //
-// The queue file is renamed before it is read, not truncated after: a hook
-// appending during the flush writes to a fresh file that this run never had,
-// which is what makes "record a turn" and "send the backlog" safe to happen at
-// the same moment. Anything the server did not take is appended back.
+// This is the explicit command. The same core runs from `punchcard stop`,
+// `status`, `today` and `week`, and from a detached child the Stop hook starts
+// on a throttle — see autosync.go for why the queue is no longer allowed to sit
+// there waiting for someone to remember it.
 func (a *App) Sync() error {
 	dir, err := StateDir()
 	if err != nil {
 		return err
 	}
-	batchPath := queuePath(dir) + ".sending"
-	if err := os.Rename(queuePath(dir), batchPath); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			if !a.JSON {
-				a.println("nothing to sync")
-			}
-			return nil
-		}
-		return fmt.Errorf("claim queue: %w", err)
-	}
-
-	runs, bad := readQueue(batchPath)
-	if len(runs) == 0 {
-		_ = os.Remove(batchPath)
-		if !a.JSON {
-			a.println("nothing to sync")
-		}
-		return nil
-	}
-
 	c, _, err := a.client()
 	if err != nil {
-		// Not signed in is not a reason to lose the backlog.
-		_ = restoreQueue(dir, batchPath)
 		return err
 	}
-
-	var accepted, duplicates int
-	for start := 0; start < len(runs); start += syncBatchSize {
-		end := start + syncBatchSize
-		if end > len(runs) {
-			end = len(runs)
-		}
-		ok, dup, err := c.RecordAgentRuns(runs[start:end])
-		if err != nil {
-			// Put back everything from this batch on, so a server that is down
-			// or a token that expired costs nothing but a later retry.
-			_ = writeQueueLines(dir, runs[start:])
-			_ = os.Remove(batchPath)
-			return err
-		}
-		accepted += ok
-		duplicates += dup
+	accepted, duplicates, bad, err := syncQueue(dir, c)
+	if err != nil {
+		return err
 	}
-	_ = os.Remove(batchPath)
-
 	if a.JSON {
 		return a.writeJSON(map[string]int{
 			"accepted": accepted, "duplicates": duplicates, "unreadable": bad,
 		})
+	}
+	if accepted == 0 && duplicates == 0 && bad == 0 {
+		a.println("nothing to sync")
+		return nil
 	}
 	a.printf("synced %d run(s)", accepted)
 	if duplicates > 0 {
@@ -349,6 +323,92 @@ func (a *App) Sync() error {
 	}
 	a.println()
 	return nil
+}
+
+// syncQueue is the flush itself, with a client the caller already holds.
+//
+// The queue file is claimed by renaming it, not truncated after reading: a hook
+// appending during the flush writes to a fresh file that this run never had,
+// which is what makes "record a turn" and "send the backlog" safe to happen at
+// the same moment. Anything the server did not take is appended back.
+func syncQueue(dir string, c *Client) (accepted, duplicates, unreadable int, err error) {
+	recoverOrphans(dir)
+
+	runs, batchPath, unreadable, err := claimQueue(dir)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	if len(runs) == 0 {
+		return 0, 0, unreadable, nil
+	}
+
+	for start := 0; start < len(runs); start += syncBatchSize {
+		end := start + syncBatchSize
+		if end > len(runs) {
+			end = len(runs)
+		}
+		ok, dup, serr := c.RecordAgentRuns(runs[start:end])
+		if serr != nil {
+			// Put back everything from this batch on, so a server that is down
+			// or a token that expired costs nothing but a later retry.
+			_ = writeQueueLines(dir, runs[start:])
+			_ = os.Remove(batchPath)
+			return accepted, duplicates, unreadable, serr
+		}
+		accepted += ok
+		duplicates += dup
+	}
+	_ = os.Remove(batchPath)
+	return accepted, duplicates, unreadable, nil
+}
+
+// claimQueue moves the queue aside under a name nothing else can be holding.
+//
+// The batch name carries this process's pid and the moment it claimed, because
+// there are now several syncers: the command, four opportunistic callers and a
+// child the hook spawns. With one shared ".sending" name, a second syncer that
+// arrived after a hook had recreated the queue would rename the new file over
+// the first syncer's in-flight batch and destroy it. Unique names make an
+// overlap harmless — the two syncers simply carry disjoint halves.
+func claimQueue(dir string) (runs []QueuedRun, batchPath string, unreadable int, err error) {
+	batchPath = fmt.Sprintf("%s.sending.%d-%d", queuePath(dir), os.Getpid(), time.Now().UnixNano())
+	if err := os.Rename(queuePath(dir), batchPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, "", 0, nil
+		}
+		return nil, "", 0, fmt.Errorf("claim queue: %w", err)
+	}
+	runs, unreadable = readQueue(batchPath)
+	if len(runs) == 0 {
+		_ = os.Remove(batchPath)
+		return nil, "", unreadable, nil
+	}
+	return runs, batchPath, unreadable, nil
+}
+
+// recoverOrphans puts back batches whose syncer died before sending them.
+//
+// Claiming and sending are two steps, and a process killed between them used to
+// take its batch with it silently. Only batches older than orphanAfter are
+// touched, so a flush in progress is never stolen; and because external_id is
+// the idempotency key, recovering one that did in fact arrive costs a
+// "duplicates" count and nothing else.
+func recoverOrphans(dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	prefix := filepath.Base(queuePath(dir)) + ".sending."
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasPrefix(e.Name(), prefix) {
+			continue
+		}
+		info, ierr := e.Info()
+		if ierr != nil || time.Since(info.ModTime()) < orphanAfter {
+			continue
+		}
+		_ = restoreQueue(dir, filepath.Join(dir, e.Name()))
+	}
 }
 
 // syncBatchSize stays under the server's per-request cap.

@@ -120,6 +120,40 @@ the CSV export is the freezing mechanism. And keep the sweep exact: it works in
 microseconds because session boundaries carry deliberate microsecond nudges, and
 its allocations must sum to the clipped duration to the second.
 
+### A queue nobody drains is a feature that silently does not exist
+
+The Claude Code hook appends a turn to `~/.local/state/punchcard/queue.jsonl`
+and returns without touching the network — deliberately, so it works offline and
+never makes the editor wait. For v1 the only thing that ever emptied that file
+was a person typing `punchcard sync`, with the README suggesting they wire up
+launchd themselves.
+
+Nobody does homework. Seventy-one turns sat unsent for two days on the author's
+own machine and nothing anywhere said so, because an empty run band looks exactly
+like a day without an agent — the same silent-zero trap as the branch listing
+below.
+
+So the queue now drains from both ends, and neither end asks for a scheduler:
+`internal/cli/autosync.go` starts a **detached, throttled** child from the Stop
+hook (the hook itself still returns immediately, which is the promise that
+mattered), and `stop`, `status`, `today` and `week` flush opportunistically
+because they already hold an authenticated client. The menu bar app does its own
+flush and is the only client that shows the backlog.
+
+The consequence: **there are now several syncers, so the claim protocol has to
+tolerate overlap.** A flush renames `queue.jsonl` aside to
+`queue.jsonl.sending.<pid>-<nanos>` before reading it. The pid is not decoration
+— with one shared `.sending` name, a second flush arriving after a hook had
+recreated the queue renamed the new file over the first flush's in-flight batch
+and destroyed it. Unique names make an overlap harmless: the two carry disjoint
+halves. Batches older than ten minutes are presumed abandoned and restored,
+which is free because `external_id` is the idempotency key.
+
+`PUNCHCARD_NO_AUTOSYNC=1` turns the automatic half off. And no test in
+`internal/cli` may spawn the real flush: the executable a test binary would
+launch is the test binary, and running it with a `sync` argument runs the whole
+suite again, recursively. `TestMain` there replaces the spawner for that reason.
+
 ### GitHub's commit listing only sees the default branch
 
 `GET /repos/{o}/{r}/commits` with no `sha` parameter walks the default branch and

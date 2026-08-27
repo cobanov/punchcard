@@ -86,11 +86,10 @@ For Claude Code:
 
 ```bash
 punchcard hook install     # merges two hooks into ~/.claude/settings.json
-punchcard sync             # send what has been recorded
 ```
 
-`hook install` merges — it never rewrites hooks it did not write, and running it
-twice does not stack a second copy.
+That is the whole setup. `hook install` merges — it never rewrites hooks it did
+not write, and running it twice does not stack a second copy.
 
 **The integration contract is a file, not an API.** Any tool that can run a
 command when it finishes a turn can report runs by appending one JSON object per
@@ -101,14 +100,29 @@ line to `$XDG_STATE_HOME/punchcard/queue.jsonl` (default
 {"tool":"codex","external_id":"<stable id, resent safely>","started_at":"2026-08-25T14:02:11+03:00","ended_at":"2026-08-25T14:44:03+03:00","model":"o4","cwd":"/path/to/work","repo":"owner/repo","tool_calls":14}
 ```
 
-Only `tool`, `external_id`, `started_at` and `ended_at` are required. `punchcard
-sync` sends the queue and clears what the server took; `external_id` is the
-idempotency key, so flushing twice costs nothing. The hook itself never touches
-the network — it appends a line and returns, which is why it still works on a
-plane and cannot make your editor wait on a server.
+Only `tool`, `external_id`, `started_at` and `ended_at` are required.
+`external_id` is the idempotency key, so sending the same line twice costs
+nothing. The hook itself never touches the network — it appends a line and
+returns, which is why it still works on a plane and cannot make your editor wait
+on a server.
 
-To send periodically, run `punchcard sync` from launchd, cron or a systemd
-timer. Nothing is lost in the meantime: the queue simply grows.
+**The queue drains itself.** A couple of minutes after a turn, the hook starts a
+detached flush in the background; and `stop`, `status`, `today` and `week` each
+send whatever is waiting before they answer, since they are already talking to
+the server. The menu bar app does the same and shows the backlog in its menu. So
+there is no scheduler to install:
+
+```bash
+punchcard sync                 # send everything right now
+PUNCHCARD_NO_AUTOSYNC=1        # record only; never send by itself
+```
+
+An earlier version left this to the reader — "run `punchcard sync` from launchd,
+cron or a systemd timer" — and the result was seventy-one turns sitting unsent
+for two days on the author's own machine, with nothing anywhere saying so. An
+empty run band looks exactly like a day without an agent, which is why the
+silence was never noticed. A periodic job still works if you want one; it is no
+longer the thing standing between recording and reporting.
 
 > A run is **reported**, not verified. punchcard fetches commits from GitHub and
 > can prove them; a run is a local client's account of itself, and the interface

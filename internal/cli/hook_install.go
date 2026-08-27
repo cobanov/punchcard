@@ -98,10 +98,12 @@ func (a *App) HookInstall() error {
 	}
 
 	a.printf("hooks installed in %s\n", path)
-	a.println("Turns are recorded to a local queue; nothing is sent until you sync.")
+	a.println("Turns are appended to a local queue and sent a couple of minutes")
+	a.println("later, in the background — and whenever you run stop, status,")
+	a.println("today or week. There is nothing else to install.")
 	a.println()
-	a.println("To send them periodically, add a launchd job that runs:")
-	a.printf("  %s sync\n", self)
+	a.printf("  %s sync                 send everything now\n", self)
+	a.println("  PUNCHCARD_NO_AUTOSYNC=1   record only; never send by itself")
 	return nil
 }
 

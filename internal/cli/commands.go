@@ -225,6 +225,11 @@ func (a *App) Stop() error {
 	// thing: the commits are not there yet and the user should not refresh
 	// looking for them.
 	a.println("  commits: queued — punchcard today will show them shortly")
+	// Agent turns, unlike commits, are already on this machine; the only thing
+	// between them and the record just closed is a request nobody had made.
+	if n := a.flushQuietly(c); n > 0 {
+		a.printf("  agent runs: %d sent\n", n)
+	}
 	return nil
 }
 
@@ -234,12 +239,14 @@ func (a *App) Status() error {
 	if err != nil {
 		return err
 	}
+	a.flushQuietly(c)
 	ws, err := c.Current()
 	if errors.Is(err, ErrNoRunningSession) {
 		if a.JSON {
 			return a.writeJSON(map[string]any{"running": false})
 		}
 		a.println("No timer running.")
+		a.warnAboutQueue()
 		a.warnAboutGitHub(c)
 		return nil
 	}
@@ -256,6 +263,7 @@ func (a *App) Status() error {
 	if cfg.Login != "" {
 		a.printf("github: %s\n", cfg.Login)
 	}
+	a.warnAboutQueue()
 	a.warnAboutGitHub(c)
 	return nil
 }
@@ -266,6 +274,7 @@ func (a *App) Today(days int) error {
 	if err != nil {
 		return err
 	}
+	a.flushQuietly(c)
 	now := time.Now()
 	from := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).
 		AddDate(0, 0, -(days - 1))
@@ -310,6 +319,22 @@ func (a *App) Today(days int) error {
 	}
 	a.printf("\n%-12s %-14s %-32s %8s\n", "", "", "total", formatTotal(total))
 	return nil
+}
+
+// warnAboutQueue says so when turns are recorded but not reaching the server.
+//
+// It only ever fires after a flush has already been attempted and failed, which
+// makes it a real signal rather than a status line: the queue is not empty and
+// the obvious remedy has just been tried. Without it the failure is invisible,
+// and an empty run band looks identical to a day without an agent.
+func (a *App) warnAboutQueue() {
+	dir, err := StateDir()
+	if err != nil {
+		return
+	}
+	if n := pendingRuns(dir); n > 0 {
+		a.warnf("queue: %s — punchcard sync\n", describePending(n))
+	}
 }
 
 // warnAboutGitHub says why commits are not arriving, if they are not.
