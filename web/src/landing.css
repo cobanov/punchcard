@@ -1,13 +1,39 @@
-/* The landing page.
- *
- * Written as its own stylesheet rather than in Tailwind, on purpose: it ships
- * before any JavaScript and shares nothing with the application, so it should
- * not carry the application's utility layer either. Everything here is about
- * one page, and it is the only page most people will ever see.
- *
- * Committed to dark. The app follows the system, but a marketing page that
- * flips between two identities has no identity — and the whole visual idea is
- * light coming through holes, which needs a dark room. */
+/* ===========================================================================
+   punchcard / time tracking that shows its work.
+
+   The design reading: a punch card is a record you cannot argue with, and the
+   only light in the room comes through its holes. So the page is a dark room
+   with one card receding into it, and the single accent is not a brand colour
+   at all, it is what is behind the card. Everything else stays grey, which is
+   what keeps that one colour meaning something.
+
+   One accent: punch amber #e9973f, 8.5:1 against the #08090b ground. Body text
+   #ecedf0 is 17.0:1, secondary #979da9 is 7.3:1, and the faint tier is #7c828d
+   for 5.2:1 (it used to be #5b6068 at 3.2:1, which is below the floor for the
+   captions and the timeline hours that use it).
+
+   Two locks are broken here, deliberately:
+
+   1. Type is IBM Plex Sans and IBM Plex Mono rather than Geist and JetBrains
+      Mono. The landing page is the front door of an application that is one
+      click away and already set in Plex; a different face on the door than in
+      the room reads as two products. The caption rule still holds: anything
+      measured is mono with tabular figures.
+
+   2. It ships as part of a Vite build rather than as a single hand-written
+      file, because the app next to it needs one anyway. It still imports no
+      framework, no utility layer and nothing from the application bundle, and
+      it paints before any of that arrives.
+
+   Written as its own stylesheet on purpose: it ships before any JavaScript and
+   shares nothing with the application, so it should not carry the
+   application's utility layer either. Everything here is about one page, and
+   it is the only page most people will ever see.
+
+   Committed to dark, one theme. The app follows the system, but a marketing
+   page that flips between two identities has no identity, and the whole visual
+   idea is light coming through holes, which needs a dark room.
+   =========================================================================== */
 
 @import "@fontsource/ibm-plex-sans/400.css";
 @import "@fontsource/ibm-plex-sans/500.css";
@@ -18,12 +44,17 @@
   --ink: #08090b;
   --text: #ecedf0;
   --dim: #979da9;
-  --faint: #5b6068;
+  --faint: #7c828d;
   --line: #1e2127;
+  --line-strong: #2b2f37;
   --punch: #e9973f;
+  --punch-hover: #f2ad63;
   --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --wrap: 68rem;
+  --nav-h: 56px;
+  --pill: 999px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 * {
@@ -33,6 +64,9 @@
 html {
   scroll-behavior: smooth;
   color-scheme: dark;
+  /* The masthead is sticky, so an anchor that lands flush with the top of the
+     window lands underneath it. */
+  scroll-padding-top: calc(var(--nav-h) + 16px);
 }
 
 body.landing {
@@ -63,19 +97,54 @@ a {
 }
 
 :focus-visible {
-  outline: 1px solid var(--punch);
+  outline: 2px solid var(--punch);
   outline-offset: 3px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: rgba(233, 151, 63, 0.32);
+}
+
+/* Film grain: fixed, unclickable, and not redrawn on scroll. Nobody notices it
+   and everybody notices its absence, because a flat black field this large
+   bands on an OLED panel without it. */
+body.landing::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* --- Language ----------------------------------------------------------- */
+
+/* Every translated string is a pair of spans and CSS picks one. The switch is
+   here rather than in JavaScript so the page is correct in the first frame:
+   `data-lang` is set by a script in <head> that runs before the body exists. */
+:root:not([data-lang="tr"]) [lang="tr"] {
+  display: none !important;
+}
+:root[data-lang="tr"] [lang="en"] {
+  display: none !important;
 }
 
 /* --- The card field ----------------------------------------------------- */
 
 /* The top band: nav, hero, and the card behind both. Nothing below it sees the
    card, because a field bright enough to be an image is a field too bright to
-   read body copy over — which is exactly how the first attempt failed. */
+   read body copy over, which is exactly how the first attempt failed. */
 .top {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  /* Pulled up under the sticky masthead so the card still starts at the very
+     top of the window. The bar floats over it on its own blur; the field is
+     already masked to nothing up there, so there is no edge to hide. */
+  margin-top: calc(-1 * var(--nav-h));
+  padding-top: var(--nav-h);
   padding-bottom: 11rem;
 }
 
@@ -98,7 +167,7 @@ a {
   height: 118%;
   transform: translateX(-50%) rotateX(66deg);
   transform-origin: 50% 100%;
-  /* Fades out at both ends so the card has no edge anywhere — it recedes into
+  /* Fades out at both ends so the card has no edge anywhere: it recedes into
      the dark above the headline and dissolves into the page below. The first
      version ended on a hard horizontal line, which read as a stripe rather than
      as a surface going away from you. */
@@ -123,49 +192,108 @@ a {
   filter: drop-shadow(0 0 6px rgba(233, 151, 63, 0.65));
 }
 
-/* --- Nav ---------------------------------------------------------------- */
+/* --- Masthead ----------------------------------------------------------- */
 
-.nav {
-  position: relative;
-  z-index: 2;
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--ink) 86%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+
+.masthead-inner {
   display: flex;
   align-items: center;
   gap: 2rem;
+  min-height: var(--nav-h);
   max-width: var(--wrap);
   margin: 0 auto;
-  padding: 1.6rem 1.5rem;
+  padding: 0 1.5rem;
 }
 
 .wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
-.nav nav {
+/* The mark is the product: three columns of a card, two of them punched. It
+   inherits the accent so the wordmark carries the same light as the field
+   behind it. */
+.wordmark-mark {
+  width: 20px;
+  height: 20px;
+  color: var(--punch);
+  flex: none;
+}
+
+.masthead nav {
   display: flex;
-  gap: 1.5rem;
+  align-items: center;
+  gap: 1.25rem;
   margin-left: auto;
   font-size: 13.5px;
   color: var(--dim);
 }
-.nav nav a:hover {
+.masthead nav a:hover {
   color: var(--text);
+}
+
+/* GitHub is an icon, not a word: it is the only nav item that leaves the site
+   and it should not read as another section. */
+.nav-icon {
+  display: inline-flex;
+  color: var(--dim);
+  transition: color 0.18s var(--ease);
+}
+.nav-icon svg {
+  width: 19px;
+  height: 19px;
+  display: block;
+}
+.nav-icon:hover {
+  color: var(--text);
+}
+
+/* Shows the language you would switch TO. */
+.lang-toggle {
+  padding: 4px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--pill);
+  background: transparent;
+  color: var(--dim);
+  font: 400 11.5px/1 var(--mono);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: color 0.18s var(--ease), border-color 0.18s var(--ease);
+}
+.lang-toggle:hover {
+  color: var(--text);
+  border-color: var(--text);
 }
 
 .signin {
   font-size: 13.5px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0.35rem 0.9rem;
-  transition: border-color 150ms;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--pill);
+  padding: 0.35rem 0.95rem;
+  transition: border-color 0.18s var(--ease), color 0.18s var(--ease);
 }
 .signin:hover {
   border-color: var(--punch);
+  color: var(--text);
 }
 
-@media (max-width: 640px) {
-  .nav nav {
+@media (max-width: 700px) {
+  .masthead nav a[href^="#"] {
     display: none;
+  }
+  .masthead-inner {
+    gap: 1rem;
   }
 }
 
@@ -179,7 +307,7 @@ main {
 .hero {
   max-width: var(--wrap);
   margin: 0 auto;
-  padding: 3.5rem 1.5rem 0;
+  padding: 4.5rem 1.5rem 0;
   text-align: center;
 }
 
@@ -258,8 +386,8 @@ main {
   color: var(--ink);
   font-size: 12.5px;
   font-weight: 500;
-  border-radius: 4px;
-  padding: 0.25rem 0.7rem;
+  border-radius: var(--pill);
+  padding: 0.25rem 0.75rem;
 }
 
 .specimen-day {
@@ -317,9 +445,9 @@ main {
 .record {
   font-size: 11px;
   color: var(--dim);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--pill);
+  padding: 0.1rem 0.5rem;
 }
 
 .punches {
@@ -347,9 +475,11 @@ main {
   padding: 6.5rem 1.5rem 0;
 }
 
+/* Caption tier: mono, uppercase, wide tracking. The same rule the app uses
+   for anything that labels rather than speaks. */
 .eyebrow {
   margin: 0 0 1.5rem;
-  font: 500 11px/1 var(--sans);
+  font: 400 11px/1 var(--mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--faint);
@@ -398,7 +528,7 @@ main {
 
 .proof {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 1.1rem 1.25rem;
   background: rgba(15, 17, 21, 0.6);
 }
@@ -417,9 +547,11 @@ main {
   font: 400 12px/1.5 var(--mono);
   color: var(--punch);
 }
+/* It is a count, so it is mono with tabular figures. */
 .proof-foot {
   margin: 0.8rem 0 0;
-  font-size: 12px;
+  font: 400 11.5px/1.5 var(--mono);
+  font-variant-numeric: tabular-nums;
   color: var(--faint);
 }
 
@@ -464,8 +596,8 @@ main {
   margin-top: 2rem;
 }
 .cta {
-  border-radius: 6px;
-  padding: 0.6rem 1.3rem;
+  border-radius: var(--pill);
+  padding: 0.65rem 1.4rem;
   font-size: 13.5px;
   font-weight: 500;
   background: var(--punch);
@@ -473,7 +605,7 @@ main {
   transition: filter 150ms, transform 150ms;
 }
 .cta:hover {
-  filter: brightness(1.1);
+  background: var(--punch-hover);
 }
 .cta:active {
   transform: scale(0.98);
@@ -481,30 +613,66 @@ main {
 .cta.ghost {
   background: none;
   color: var(--dim);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
 }
 .cta.ghost:hover {
   color: var(--text);
   border-color: var(--faint);
 }
 
+/* --- Footer ------------------------------------------------------------- */
+
 footer {
-  max-width: var(--wrap);
-  margin: 0 auto;
-  padding: 2rem 1.5rem 3rem;
   border-top: 1px solid var(--line);
-  display: flex;
-  gap: 1.5rem;
   font-size: 12.5px;
   color: var(--faint);
 }
+
+.footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.75rem;
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 2.2rem 1.5rem 3rem;
+}
+
+.footer-home {
+  color: var(--dim);
+}
+
 footer nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 1.2rem;
-  margin-left: auto;
 }
+
 footer a:hover {
   color: var(--text);
+}
+
+.footer-social {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.footer-social a {
+  display: inline-flex;
+  transition: color 0.18s var(--ease);
+}
+.footer-social svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+/* Licence and year: measured, therefore mono. */
+.footer-meta {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -513,5 +681,6 @@ footer a:hover {
   }
   * {
     transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
   }
 }

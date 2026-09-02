@@ -3,27 +3,76 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>punchcard — time tracking that shows its work</title>
+    <title>punchcard · time tracking that shows its work</title>
     <meta
       name="description"
       content="Start a timer. When you stop, punchcard attaches the commits you pushed while it ran. Open source, self-hostable."
     />
+    <meta name="theme-color" content="#08090b" />
     <meta property="og:title" content="punchcard" />
     <meta property="og:description" content="Time tracking that shows its work." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://punchcard.cobanov.run" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="tr_TR" />
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c0d10'/%3E%3Crect x='8' y='9' width='4' height='6' rx='1' fill='%23e9973f'/%3E%3Crect x='14' y='9' width='4' height='6' rx='1' fill='%23343943'/%3E%3Crect x='20' y='9' width='4' height='6' rx='1' fill='%23e9973f'/%3E%3Crect x='8' y='18' width='4' height='6' rx='1' fill='%23343943'/%3E%3Crect x='14' y='18' width='4' height='6' rx='1' fill='%23e9973f'/%3E%3Crect x='20' y='18' width='4' height='6' rx='1' fill='%23343943'/%3E%3C/svg%3E"
     />
     <script type="module" src="/src/landing.ts"></script>
+
+    <script>
+      // The language is picked before anything paints, so the wrong one is
+      // never visible for a frame. English is the default and the browser's
+      // own language is not consulted: Turkish is a choice a visitor makes by
+      // pressing the button, not something inferred from where they are.
+      (function () {
+        var lang = "en";
+        try {
+          lang = localStorage.getItem("lang") === "tr" ? "tr" : "en";
+        } catch (e) {}
+        document.documentElement.setAttribute("data-lang", lang);
+        document.documentElement.lang = lang;
+      })();
+    </script>
   </head>
   <body class="landing">
-    <a href="#what" class="skip">Skip to content</a>
+    <a href="#what" class="skip">
+      <span lang="en">Skip to content</span><span lang="tr">İçeriğe atla</span>
+    </a>
+
+    <!-- Sticky, and outside the card field on purpose: it has to survive the
+         scroll, and a sticky element inside an `overflow: hidden` parent stops
+         sticking the moment that parent leaves. The field is pulled up under it
+         instead, so the card still starts at the very top of the window and the
+         bar floats over it on its own blur. -->
+    <header class="masthead">
+      <div class="masthead-inner">
+        <a href="/" class="wordmark">
+          <svg class="wordmark-mark" viewBox="0 0 20 20" aria-hidden="true">
+            <rect x="1.5" y="4" width="17" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-opacity=".4" />
+            <rect x="4.6" y="7" width="2.6" height="6" rx="1.3" fill="currentColor" />
+            <rect x="8.7" y="7" width="2.6" height="6" rx="1.3" fill="currentColor" fill-opacity=".4" />
+            <rect x="12.8" y="7" width="2.6" height="6" rx="1.3" fill="currentColor" />
+          </svg>
+          punchcard
+        </a>
+        <nav>
+          <a href="#what"><span lang="en">How it works</span><span lang="tr">Nasıl çalışıyor</span></a>
+          <a href="#recover"><span lang="en">Recovery</span><span lang="tr">Kurtarma</span></a>
+          <a href="/docs">API</a>
+          <a class="nav-icon" href="https://github.com/cobanov/punchcard" aria-label="GitHub">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.75 2.69 1.25 3.34.95.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18.92-.26 1.91-.38 2.89-.39.98.01 1.97.13 2.89.39 2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12 0 1.53-.01 2.76-.01 3.14 0 .3.21.67.8.55C20.22 21.38 23.5 17.08 23.5 12c0-6.35-5.15-11.5-11.5-11.5z"/></svg>
+          </a>
+          <button class="lang-toggle" id="lang-toggle" aria-label="Language / Dil">TR</button>
+          <a href="/app" class="signin"><span lang="en">Sign in</span><span lang="tr">Giriş</span></a>
+        </nav>
+      </div>
+    </header>
 
     <!-- The card itself, at scale, receding into the dark. Every other product
-         page in this category puts a photograph here — a planet, a city, a
-         desk. This is the object the product is named after, drawn rather than
+         page in this category puts a photograph here: a planet, a city, a desk.
+         This is the object the product is named after, drawn rather than
          photographed, and the light through its punches is where the one accent
          colour in the whole product comes from.
 
@@ -33,29 +82,30 @@
     <div class="top">
       <div class="card-field" aria-hidden="true"><svg id="field" preserveAspectRatio="xMidYMax slice"></svg></div>
 
-      <header class="nav">
-      <a href="/" class="wordmark">punchcard</a>
-      <nav>
-        <a href="#what">How it works</a>
-        <a href="#recover">Recovery</a>
-        <a href="/docs">API</a>
-      </nav>
-      <a href="/app" class="signin">Sign in</a>
-    </header>
-
       <section class="hero">
         <h1>
-          Time tracking<br />
-          that shows its work.
+          <span lang="en">Time tracking<br />that shows its work.</span>
+          <span lang="tr">Kanıtını gösteren<br />zaman takibi.</span>
         </h1>
         <p class="sub">
-          Start a timer, say what you are doing, stop it. punchcard attaches the commits you
-          pushed while it ran — so the record is not a number you typed, it is what happened.
+          <span lang="en">
+            Start a timer, say what you are doing, stop it. punchcard attaches the commits you
+            pushed while it ran, so the record is not a number you typed. It is what happened.
+          </span>
+          <span lang="tr">
+            Sayacı başlat, ne yaptığını yaz, durdur. punchcard sayaç çalışırken push ettiğin
+            commit'leri kayda iliştirir; kayıt senin yazdığın bir sayı değil, olan bitenin kendisi.
+          </span>
         </p>
 
         <!-- The product's own artifact, floating over the field the way the
              reference floats its input box. Real markup, real proportions: this
-             is what the app draws. -->
+             is what the app draws.
+
+             It stays in English in both languages, deliberately. It is a
+             picture of the running application, and the application has one
+             interface language; translating the specimen would advertise a
+             Turkish app that does not exist. -->
         <div class="specimen">
           <div class="specimen-head">
             <span class="clock">01:42:07</span>
@@ -98,15 +148,26 @@
 
     <main>
       <section id="what" class="strip">
-        <p class="eyebrow">What it does</p>
+        <p class="eyebrow"><span lang="en">What it does</span><span lang="tr">Ne yapıyor</span></p>
         <div class="two">
           <div>
-            <h2>The commits come with the hours.</h2>
+            <h2>
+              <span lang="en">The commits come with the hours.</span>
+              <span lang="tr">Saatlerin yanında commit'ler de geliyor.</span>
+            </h2>
             <p>
-              Every tracker can tell you that Tuesday had six hours in it. punchcard tells you
-              which commits happened inside them, in which repositories, on which branches —
-              including the branch you were actually working on, which is the part most
-              integrations quietly miss.
+              <span lang="en">
+                Every tracker can tell you that Tuesday had six hours in it. punchcard tells you
+                which commits happened inside them, in which repositories, on which branches,
+                including the branch you were actually working on, which is the part most
+                integrations quietly miss.
+              </span>
+              <span lang="tr">
+                Her zaman takipçisi salının altı saat olduğunu söyleyebilir. punchcard o saatlerin
+                içinde hangi commit'lerin atıldığını, hangi repolarda ve hangi dallarda olduğunu
+                söylüyor: üstünde gerçekten çalıştığın dal dahil, ki çoğu entegrasyonun sessizce
+                atladığı yer tam orası.
+              </span>
             </p>
           </div>
           <div class="proof">
@@ -114,23 +175,36 @@
             <div class="proof-line"><span class="sha">e279aeb</span> pin the signing certificate</div>
             <div class="proof-line"><span class="sha">638cb0a</span> release config follows the rename</div>
             <div class="proof-line"><span class="sha">970eaf5</span> say what a reviewer needs</div>
-            <p class="proof-foot">4 of 12 commits · 5 repositories · nothing configured</p>
+            <p class="proof-foot">
+              <span lang="en">4 of 12 commits · 5 repositories · nothing configured</span>
+              <span lang="tr">12 commit'in 4'ü · 5 repo · hiçbir ayar yapılmadı</span>
+            </p>
           </div>
         </div>
       </section>
 
       <section id="recover" class="strip">
-        <p class="eyebrow">When you forget</p>
-        <h2 class="wide">A timer you forgot to start is not lost work.</h2>
+        <p class="eyebrow"><span lang="en">When you forget</span><span lang="tr">Unuttuğunda</span></p>
+        <h2 class="wide">
+          <span lang="en">A timer you forgot to start is not lost work.</span>
+          <span lang="tr">Başlatmayı unuttuğun sayaç, kaybolmuş iş demek değil.</span>
+        </h2>
         <p class="lede">
-          The commits are already there and already timestamped. punchcard shows them as
-          punches with no card around them, and turns them into a record when you say so.
-          That is a better answer than guessing at idle time, because the evidence is real.
+          <span lang="en">
+            The commits are already there and already timestamped. punchcard shows them as
+            punches with no card around them, and turns them into a record when you say so.
+            That is a better answer than guessing at idle time, because the evidence is real.
+          </span>
+          <span lang="tr">
+            Commit'ler zaten orada ve zaten zaman damgalı. punchcard onları kartsız delikler
+            olarak gösteriyor, sen dediğinde de kayda çeviriyor. Boşta geçen süreyi tahmin
+            etmekten iyisi bu, çünkü kanıt gerçek.
+          </span>
         </p>
       </section>
 
       <section class="strip">
-        <p class="eyebrow">Where it runs</p>
+        <p class="eyebrow"><span lang="en">Where it runs</span><span lang="tr">Nerede çalışıyor</span></p>
         <div class="three">
           <div>
             <h3>Terminal</h3>
@@ -139,37 +213,107 @@ punchcard stop
 punchcard today</code></pre>
           </div>
           <div>
-            <h3>Menu bar</h3>
-            <p>A macOS app that keeps the running timer in view and tells you when one has been running for eight hours.</p>
+            <h3><span lang="en">Menu bar</span><span lang="tr">Menü çubuğu</span></h3>
+            <p>
+              <span lang="en">A macOS app that keeps the running timer in view and tells you when one has been running for eight hours.</span>
+              <span lang="tr">Çalışan sayacı görünürde tutan ve biri sekiz saattir açık kaldığında söyleyen bir macOS uygulaması.</span>
+            </p>
           </div>
           <div>
-            <h3>Browser</h3>
-            <p>The full picture: the day, projects and rates, reports, and the commits behind all of it.</p>
+            <h3><span lang="en">Browser</span><span lang="tr">Tarayıcı</span></h3>
+            <p>
+              <span lang="en">The full picture: the day, projects and rates, reports, and the commits behind all of it.</span>
+              <span lang="tr">Bütün resim: gün, projeler ve ücretler, raporlar ve hepsinin arkasındaki commit'ler.</span>
+            </p>
           </div>
         </div>
       </section>
 
       <section class="strip close">
-        <h2 class="wide">Yours to run.</h2>
+        <h2 class="wide">
+          <span lang="en">Yours to run.</span>
+          <span lang="tr">Kendi sunucunda çalışır.</span>
+        </h2>
         <p class="lede">
-          MIT licensed. One Go binary and a Postgres — the hosted instance and a self-hosted
-          one are the same build.
+          <span lang="en">
+            MIT licensed. One Go binary and a Postgres: the hosted instance and a self-hosted
+            one are the same build.
+          </span>
+          <span lang="tr">
+            MIT lisanslı. Tek bir Go binary'si ve bir Postgres: barındırılan sürüm ile kendi
+            kurduğun aynı derleme.
+          </span>
         </p>
         <div class="actions">
-          <a href="/app" class="cta">Start tracking</a>
-          <a href="/docs" class="cta ghost">Read the API</a>
+          <a href="/app" class="cta"><span lang="en">Start tracking</span><span lang="tr">Takibe başla</span></a>
+          <a href="/docs" class="cta ghost"><span lang="en">Read the API</span><span lang="tr">API'yi oku</span></a>
         </div>
       </section>
     </main>
 
     <footer>
-      <span>punchcard</span>
-      <nav>
-        <a href="/docs">API</a>
-        <a href="/privacy">Privacy</a>
-        <a href="/terms">Terms</a>
-        <a href="https://github.com/cobanov/punchcard">Source</a>
-      </nav>
+      <div class="footer-inner">
+        <a href="https://cobanov.dev" class="footer-home">cobanov.dev</a>
+        <nav>
+          <a href="/docs">API</a>
+          <a href="/privacy"><span lang="en">Privacy</span><span lang="tr">Gizlilik</span></a>
+          <a href="/terms"><span lang="en">Terms</span><span lang="tr">Koşullar</span></a>
+          <a href="/support"><span lang="en">Support</span><span lang="tr">Destek</span></a>
+        </nav>
+        <div class="footer-social">
+          <a href="https://x.com/mertcobanov" aria-label="X">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
+          <a href="https://github.com/cobanov/punchcard" aria-label="GitHub">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.19 1.76 1.19 1.03 1.75 2.69 1.25 3.34.95.1-.75.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18.92-.26 1.91-.38 2.89-.39.98.01 1.97.13 2.89.39 2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12 0 1.53-.01 2.76-.01 3.14 0 .3.21.67.8.55C20.22 21.38 23.5 17.08 23.5 12c0-6.35-5.15-11.5-11.5-11.5z"/></svg>
+          </a>
+          <a href="https://www.linkedin.com/in/mertcobanoglu/" aria-label="LinkedIn">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.225 0z"/></svg>
+          </a>
+          <a href="mailto:mertcobanov@gmail.com" aria-label="E-mail">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4.24-8 5-8-5V6.5l8 5 8-5v1.74z"/></svg>
+          </a>
+          <span class="footer-meta">MIT · 2026</span>
+        </div>
+      </div>
     </footer>
+
+    <script>
+      // The toggle shows the language you would switch TO, and the choice
+      // survives a reload. It is the only thing that writes `lang`, which is
+      // what keeps the pre-paint script above honest.
+      (function () {
+        var toggle = document.getElementById("lang-toggle");
+        if (!toggle) return;
+        function current() {
+          return document.documentElement.getAttribute("data-lang") === "tr" ? "tr" : "en";
+        }
+        function refresh() {
+          toggle.textContent = current() === "tr" ? "EN" : "TR";
+        }
+        refresh();
+        toggle.addEventListener("click", function () {
+          var next = current() === "tr" ? "en" : "tr";
+          document.documentElement.setAttribute("data-lang", next);
+          document.documentElement.lang = next;
+          try {
+            localStorage.setItem("lang", next);
+          } catch (e) {}
+          refresh();
+        });
+      })();
+    </script>
+
+    <!-- Analytics. One key per site, created in the panel at oa.cobanov.run.
+         Commented out rather than shipped with a placeholder: a keyless tag
+         loads, does nothing, and looks installed. Paste the oa_pk_... key in
+         and uncomment.
+    <script
+      async
+      src="https://oa-c.cobanov.run/oa.js"
+      data-key="oa_pk_..."
+      data-collector="https://oa-c.cobanov.run"
+    ></script>
+    -->
   </body>
 </html>
