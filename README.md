@@ -31,28 +31,24 @@ It also runs backwards. Commits pushed while no timer was running come back as a
 suggested record: a timer you forgot to start is not lost work, because the
 evidence was on GitHub the whole time.
 
-- **Every branch, not just the default one.** `GET /repos/{o}/{r}/commits` walks
-  the default branch and nothing else, so a week spent on a feature branch
-  returns zero commits, and zero looks exactly like a week of no work. The
-  scanner fetches the branch list and walks all of them, deduping by SHA.
-- **Reports are derived from the evidence, not from what you guessed at 09:00.**
-  A session carries two assertions: when you worked (the timer knows) and what
-  you worked on (you guessed once, at the start). Each commit and agent run is
-  resolved to a project on its own, and the session's wall clock is split
-  accordingly at read time. The declaration is the fallback for the quiet
-  minutes, never the overwrite.
-- **Agent turns count as evidence.** A local hook records each Claude Code turn
-  and the interval lands under whichever session covers it. Runs never start a
-  timer and never become billable minutes: they are attached to time you
-  declared yourself, and the interface keeps "fetched from GitHub and provable"
-  visibly apart from "a local client's account of itself".
-- **Money never touches a float.** Rates are integer minor units and amounts are
-  `seconds * rate / 3600` in integer arithmetic. 333.33 per hour for ninety
-  minutes has exactly one correct answer, and binary floating point is not how
-  you get it.
-- **Days end in your timezone.** A session from 22:30 to 23:30 UTC belongs to
-  tomorrow in Istanbul. Everything is stored UTC and only the presentation
-  shifts, so the day boundary is drawn once, correctly, in `users.timezone`.
+- **Every branch, not just the default one.** `GET /repos/{o}/{r}/commits` walks the
+  default branch and nothing else, so a week on a feature branch returns zero commits, and
+  zero looks exactly like a week of no work. The scanner walks every branch, deduping by SHA.
+- **Reports are derived from the evidence, not from what you guessed at 09:00.** A session
+  asserts when you worked (the timer knows) and what you worked on (you guessed once). Each
+  commit and agent run is resolved to a project on its own and the wall clock is split
+  accordingly at read time. The declaration is the fallback for the quiet minutes, never the
+  overwrite.
+- **Agent turns count as evidence.** A local hook records each Claude Code turn under
+  whichever session covers it. Runs never start a timer and never become billable minutes,
+  and the interface keeps "fetched from GitHub and provable" visibly apart from "a local
+  client's account of itself".
+- **Money never touches a float.** Rates are integer minor units, amounts are
+  `seconds * rate / 3600` in integer arithmetic. 333.33 an hour for ninety minutes has
+  exactly one correct answer, and binary floating point is not how you get it.
+- **Days end in your timezone.** 22:30 to 23:30 UTC belongs to tomorrow in Istanbul.
+  Everything is stored UTC and only the presentation shifts, so the boundary is drawn once,
+  in `users.timezone`.
 
 ## Try it
 
@@ -72,8 +68,8 @@ same binary at your own.
 
 ## The clients
 
-All three talk to the same public API. There is no privileged path, so anything
-awkward for a client is awkward for every client and belongs fixed in the API.
+All three talk to the same public API. There is no privileged path, so anything awkward for
+one client is awkward for every client and belongs fixed in the API.
 
 | | |
 | --- | --- |
@@ -81,21 +77,18 @@ awkward for a client is awkward for every client and belongs fixed in the API.
 | **Web** | `/app`. React and Vite, built into the binary. The day drawn as a timeline, inline correction, projects and rates, reports with the commits behind them. |
 | **Menu bar** | `apps/menubar`, macOS 14+. Keeps the running timer in view and says something when one has been running for eight hours. `make -C apps/menubar bundle`. |
 
-The project name is a prefix: `caps` finds `capsarsiv`. An exact name always
-wins, and an ambiguous prefix tells you what it matched.
+The project name is a prefix, so `caps` finds `capsarsiv`. An exact name always wins, and an
+ambiguous prefix tells you what it matched.
 
-`login` binds a loopback listener, opens the browser at the server's GitHub
-sign-in, and trades the one-time code it gets back for a device token. The token
-itself never passes through the browser, so it never reaches browser history or
-OS logs. It is stored in your config directory, mode 0600.
+`login` binds a loopback listener and trades a one-time code for a device token, so the
+token never passes through the browser and never reaches browser history or OS logs. It is
+stored in your config directory, mode 0600.
 
-Linking a repository to a project is optional. The scanner asks GitHub which
-repositories the account pushed to and looks there on its own; a link is what
-you add when you want punchcard to guess which project a stretch of unmatched
-commits belongs to. It did not start that way, and the mistake is worth naming:
-scanning only linked repositories turned an optional refinement into a setup
-step, and someone who connected GitHub, started a timer and stopped it got
-nothing back, with no error to explain it.
+Linking a repository to a project is optional: the scanner asks GitHub what the account
+pushed to and looks there on its own. The mistake is worth naming, because it did not start
+that way. Scanning only linked repositories turned an optional refinement into a setup step,
+so someone who connected GitHub, started a timer and stopped it got nothing back, with no
+error to explain it.
 
 ## Where the hour went
 
@@ -123,11 +116,10 @@ punchcard hook install     # merges two hooks into ~/.claude/settings.json
 punchcard backfill         # reads the last 90 days of local transcripts
 ```
 
-`hook install` merges. It never rewrites hooks it did not write, and running it
-twice does not stack a second copy. `backfill` exists because a hook can only
-see turns that happen after it is installed, which on day one is none of them,
-while Claude Code has been writing a full transcript of every session all along.
-`--days=N` and `--dry-run` are there.
+`hook install` merges: it never rewrites hooks it did not write, and running it twice does
+not stack a copy. `backfill` exists because a hook only sees turns after it is installed,
+which on day one is none of them, while Claude Code has been writing a full transcript all
+along.
 
 **The integration contract is a file, not an API.** Any tool that can run a
 command when it finishes a turn can report runs by appending one JSON object per
@@ -144,10 +136,8 @@ nothing. The hook itself never touches the network. It appends a line and
 returns, which is why it still works on a plane and cannot make your editor wait
 on a server.
 
-**The queue drains itself.** A couple of minutes after a turn the hook starts a
-detached flush in the background, and `stop`, `status`, `today` and `week` each
-send whatever is waiting before they answer, since they are already talking to
-the server. The menu bar app does the same and shows the backlog in its menu.
+**The queue drains itself.** The hook starts a detached flush a couple of minutes after a
+turn, and `stop`, `status`, `today` and `week` each send what is waiting before they answer.
 There is no scheduler to install.
 
 ```sh
@@ -155,12 +145,10 @@ punchcard sync                 # send everything right now
 PUNCHCARD_NO_AUTOSYNC=1        # record only, never send by itself
 ```
 
-An earlier version left this to the reader ("run `punchcard sync` from launchd,
-cron or a systemd timer") and the result was seventy-one turns sitting unsent
-for two days on the author's own machine, with nothing anywhere saying so. An
-empty run band looks exactly like a day without an agent, which is why the
-silence went unnoticed. A periodic job still works if you want one. It is no
-longer the thing standing between recording and reporting.
+An earlier version left this to the reader ("run `punchcard sync` from cron") and the result
+was seventy-one turns sitting unsent for two days on the author's own machine, with nothing
+saying so. An empty run band looks exactly like a day without an agent, which is why the
+silence went unnoticed.
 
 ## Self-hosting
 
@@ -196,24 +184,20 @@ testcontainers. **It needs `DOCKER_HOST` exported.** Without it the integration
 tests skip and the run goes green having tested nothing, which is the failure
 mode this line exists to prevent.
 
-Two more of those. `make openapi` after any route change, because
-`openapi-check` fails the gate when `docs/openapi.json` drifts and adding one
-field to a handler's input struct is enough to cause it. And `make web` after a
-frontend change, followed by a server restart: the binary serves the embedded
-`dist`, not `web/dist`, so a build you did not embed is a change nobody sees.
+Two more of those: `make openapi` after any route change, because the gate fails when
+`docs/openapi.json` drifts and one new field in an input struct is enough. And `make web`
+after a frontend change, then restart, because the binary serves the embedded `dist`, not
+`web/dist`, so a build you did not embed is a change nobody sees.
 
 ```
-cmd/punchcard        the server binary: serve, migrate
-cmd/punchcard-cli    the command-line client
-internal/cli         the client's logic, tested against a fake API
+cmd/                 the server binary and the CLI
 db/migrations        the schema, and the only source of truth (sqlc reads it)
 db/queries           hand-written SQL; `make sqlc` generates the Go
 internal/repo        every database access; nothing else imports pgx
 internal/service     the domain: projects, sessions, attribution, reports
-internal/github      the GitHub REST client and the branch-walking scanner
+internal/github      the REST client and the branch-walking scanner
 internal/http        transport: huma operations, middleware, SSE, embedded web
-web/                 the React app, built into internal/http/webui/dist
-apps/menubar         the macOS menu bar app (Swift)
+web/, apps/menubar   the React app and the macOS menu bar app
 ```
 
 Two rules live in the schema rather than in Go, and they belong there:
@@ -224,17 +208,16 @@ CREATE UNIQUE INDEX one_open_session_per_user ON work_sessions (user_id)
 CREATE UNIQUE INDEX idx_session_commits_commit ON session_commits (commit_id);
 ```
 
-Attribution asks which session covers a given instant and assumes the answer is
-at most one. Two open sessions make the ranges overlap, a commit lands in two
-records, and every report touching those days is quietly wrong with no error
-anywhere. A check in the service layer would lose that race between two clients.
+Attribution asks which session covers an instant and assumes the answer is at most one. Two
+open sessions overlap, a commit lands in two records, and every report touching those days is
+quietly wrong with no error anywhere. A check in the service layer would lose that race
+between two clients.
 
 ## Origin
 
-punchcard's chassis, meaning identity, the event outbox, webhooks, SSE,
-observability and the self-host packaging, is derived from
-[helva](https://github.com/cobanov/helva-todo), an agent-native todo service by
-the same author. The domain is new. The parts that have nothing to do with todos
+The chassis (identity, the event outbox, webhooks, SSE, observability, the self-host
+packaging) comes from [helva](https://github.com/cobanov/helva-todo), an agent-native todo
+service by the same author. The domain is new; the parts that have nothing to do with todos
 or timers were not written twice.
 
 ## Licence
